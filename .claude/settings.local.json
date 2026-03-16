@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const p=require\\(''C:/GitHub/Megaro_wave/mobile/node_modules/react-native/package.json''\\); console.log\\(p.version\\)\")"
+    ]
+  }
+}
