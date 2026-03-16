@@ -3,7 +3,6 @@ import {
   getFirestore,
   doc,
   setDoc,
-  getDoc,
   collection,
   getDocs,
   orderBy,
@@ -38,10 +37,10 @@ if (isConfigured) {
 }
 
 // ── defalt コレクション ──────────────────────────────────
-// ドキュメントID = user_name, フィールド: ssid, fast (Mbps)
+// defalt/{userName}/wifi/{ssid}  フィールド: ssid, fast (Mbps)
 
 /**
- * WiFi情報を保存
+ * WiFi情報を保存（SSIDごとに別ドキュメント）
  * @param {string} userName
  * @param {string} ssid
  * @param {number} fast  通信速度 (Mbps)
@@ -52,29 +51,29 @@ export async function saveWifiInfo(userName, ssid, fast) {
     return
   }
   try {
-    await setDoc(doc(db, 'defalt', userName), {
+    await setDoc(doc(db, 'defalt', userName, 'wifi', ssid), {
       ssid,
       fast,
       updatedAt: serverTimestamp(),
-    }, { merge: true })
+    })
   } catch (e) {
     console.error('[Firebase] saveWifiInfo failed:', e)
   }
 }
 
 /**
- * ユーザーのWifi情報を取得
+ * ユーザーの保存済みWifi一覧を取得
  * @param {string} userName
- * @returns {{ ssid: string, fast: number } | null}
+ * @returns {{ ssid: string, fast: number }[]}
  */
 export async function getWifiInfo(userName) {
-  if (!isConfigured) return null
+  if (!isConfigured) return []
   try {
-    const snap = await getDoc(doc(db, 'defalt', userName))
-    return snap.exists() ? snap.data() : null
+    const snap = await getDocs(collection(db, 'defalt', userName, 'wifi'))
+    return snap.docs.map(d => d.data())
   } catch (e) {
     console.error('[Firebase] getWifiInfo failed:', e)
-    return null
+    return []
   }
 }
 

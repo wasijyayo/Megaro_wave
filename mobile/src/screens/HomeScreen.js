@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, Animated, useWindowDimensions, StyleSheet,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { getWaveParams } from '../utils/waveParams'
-import { getWifiInfo, getTopScores } from '../firebase'
+import { getTopScores } from '../firebase'
 
 // ── Wave アニメーション ──────────────────────────────────
 function WaveBar({ amplitude, index }) {
@@ -40,7 +40,7 @@ function RankRow({ rank, name, score }) {
 }
 
 // ── HomeScreen ───────────────────────────────────────────
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen({ navigation, route }) {
   const { width } = useWindowDimensions()
   const insets    = useSafeAreaInsets()
   const isTablet  = width >= 768
@@ -52,6 +52,14 @@ export default function HomeScreen({ navigation }) {
   useEffect(() => {
     getTopScores(10).then(setRankings)
   }, [])
+
+  // WifiSelectScreenから戻ったとき、選択されたWiFiをセット
+  useEffect(() => {
+    if (route.params?.selectedWifi) {
+      setWifiInfo(route.params.selectedWifi)
+      navigation.setParams({ selectedWifi: undefined })
+    }
+  }, [route.params?.selectedWifi])
 
   const params = wifiInfo ? getWaveParams(wifiInfo.fast) : getWaveParams(0)
 

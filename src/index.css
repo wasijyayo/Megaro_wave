@@ -13,6 +13,25 @@ html, body, #root {
   color: #fff;
 }
 
+@keyframes waveDrift {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-600px); }
+}
+
+@keyframes rainFall {
+  from { transform: translateY(-30px); }
+  to   { transform: translateY(100vh); }
+}
+
+@keyframes lightningFlash {
+  0%   { opacity: 0; }
+  10%  { opacity: 1; }
+  30%  { opacity: 0.5; }
+  50%  { opacity: 1; }
+  80%  { opacity: 0.7; }
+  100% { opacity: 0; }
+}
+
 @keyframes popupFade {
   0%   { opacity: 1; transform: translateX(-50%) translateY(0); }
   70%  { opacity: 1; transform: translateX(-50%) translateY(-20px); }

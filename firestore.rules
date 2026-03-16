@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // WiFi情報: defalt/{userId}/wifi/{ssid}
+    match /defalt/{userId}/wifi/{ssid} {
+      allow read, write: if true;
+    }
+
+    // スコアランキング: clea_date/{userId}
+    match /clea_date/{userId} {
+      allow read, write: if true;
+    }
+  }
+}

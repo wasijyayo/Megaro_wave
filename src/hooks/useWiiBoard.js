@@ -18,8 +18,9 @@ export function useWiiBoard() {
   const [sensors,   setSensors]   = useState({ topLeft: 0, topRight: 0, bottomLeft: 0, bottomRight: 0 })
   const [cop,       setCoP]       = useState({ x: 0, y: 0, total: 0 })
 
-  // ゲームループで直接読む用のref (state更新によるeffect再起動を避ける)
   const copRef    = useRef({ x: 0, y: 0, total: 0 })
+  const rawCopRef = useRef({ x: 0, y: 0 })   // キャリブレーション前の生値
+  const offsetRef = useRef({ x: 0, y: 0 })   // キャリブレーション原点
   const deviceRef = useRef(null)
 
   const connect = useCallback(async () => {
@@ -45,13 +46,19 @@ export function useWiiBoard() {
           topLeft:     ext.getUint16(4, false),
           bottomLeft:  ext.getUint16(6, false),
         }
-        const newCop = computeCoP(s)
-        copRef.current = newCop
+        const raw = computeCoP(s)
+        rawCopRef.current = raw
+
+        const calibrated = {
+          x:     raw.x - offsetRef.current.x,
+          y:     raw.y - offsetRef.current.y,
+          total: raw.total,
+        }
+        copRef.current = calibrated
         setSensors(s)
-        setCoP(newCop)
+        setCoP(calibrated)
       })
 
-      // ステータス確認 → レポートモード 0x32 (Core + Extension) に設定
       await device.sendReport(0x15, new Uint8Array([0x00]))
       await device.sendReport(0x12, new Uint8Array([0x04, 0x32]))
 
@@ -71,5 +78,13 @@ export function useWiiBoard() {
     setConnected(false)
   }, [])
 
-  return { connected, sensors, cop, copRef, connect, disconnect }
+  /** 現在の立ち位置を原点(0,0)に補正する */
+  const calibrate = useCallback(() => {
+    offsetRef.current = { x: rawCopRef.current.x, y: rawCopRef.current.y }
+    const zeroCop = { x: 0, y: 0, total: copRef.current.total }
+    copRef.current = zeroCop
+    setCoP(zeroCop)
+  }, [])
+
+  return { connected, sensors, cop, copRef, connect, disconnect, calibrate }
 }
