@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import StartScreen from './components/game/StartScreen.jsx'
-import GameScene   from './components/game/GameScene.jsx'
-import GameOver    from './components/game/GameOver.jsx'
+import HomeScreen from './components/HomeScreen.jsx'
+import GameScene  from './components/game/GameScene.jsx'
+import GameOver   from './components/game/GameOver.jsx'
 
 export default function App() {
-  const [screen,     setScreen]     = useState('start')
-  const [playerName, setPlayerName] = useState('Player')
-  const [finalScore, setFinalScore] = useState(0)
+  const [screen,       setScreen]       = useState('home')
+  const [playerName,   setPlayerName]   = useState('Player')
+  const [finalScore,   setFinalScore]   = useState(0)
 
   const handleStart = (name) => {
     setPlayerName(name)
@@ -20,14 +20,14 @@ export default function App() {
 
   const handleRestart = () => {
     setFinalScore(0)
-    setScreen('start')
+    setScreen('home')
   }
 
   return (
     <>
-      {screen === 'start'    && <StartScreen onStart={handleStart} />}
-      {screen === 'game'     && <GameScene   playerName={playerName} onGameOver={handleGameOver} />}
-      {screen === 'gameover' && <GameOver    score={finalScore} playerName={playerName} onRestart={handleRestart} />}
+      {screen === 'home'     && <HomeScreen onStart={handleStart} />}
+      {screen === 'game'     && <GameScene  playerName={playerName} onGameOver={handleGameOver} />}
+      {screen === 'gameover' && <GameOver   score={finalScore} playerName={playerName} onRestart={handleRestart} />}
     </>
   )
 }
