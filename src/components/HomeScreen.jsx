@@ -138,6 +138,222 @@ function BottomWave({ params, copRef }) {
   )
 }
 
+// ── Wii Board 補正ポップアップ ───────────────────────────
+function CalibPopup({ sensors, cop, onCalibrate, sensitivity, onSensitivity, sensorScale, onSensorScale, sensorRate, onSensorRate, onClose }) {
+  const [calibrated, setCalibrated] = useState(false)
+
+  const handleCalib = () => {
+    onCalibrate()
+    setCalibrated(true)
+    setTimeout(() => setCalibrated(false), 1500)
+  }
+
+  const total = sensors.topLeft + sensors.topRight + sensors.bottomLeft + sensors.bottomRight
+
+  return (
+    <div style={cp.overlay} onClick={onClose}>
+      <div style={cp.modal} onClick={e => e.stopPropagation()}>
+
+        <div style={cp.header}>
+          <span style={cp.title}>wii bord 補正</span>
+          <button style={cp.closeBtn} onClick={onClose}>✕</button>
+        </div>
+
+        {/* センサー値 + 個別倍率（ボード形状に配置） */}
+        <div style={cp.boardWrap}>
+          <div style={cp.boardLabel}>センサー値 / 個別倍率（生カウント）</div>
+          <div style={cp.boardGrid}>
+            {[
+              { key: 'topLeft',     label: 'Top Left'     },
+              { key: 'topRight',    label: 'Top Right'    },
+              { key: 'bottomLeft',  label: 'Bottom Left'  },
+              { key: 'bottomRight', label: 'Bottom Right' },
+            ].map(({ key, label }) => (
+              <div key={key} style={cp.sensorCell}>
+                <div style={cp.sensorLabel}>{label}</div>
+                <div style={cp.sensorVal}>{Math.round(sensors[key])}</div>
+                {/* 倍率スライダー（黄） */}
+                <div style={cp.sensorScaleRow}>
+                  <input
+                    type="range" min="0.5" max="3.0" step="0.05"
+                    value={sensorScale[key]}
+                    onChange={e => onSensorScale(key, parseFloat(e.target.value))}
+                    style={cp.sliderSmall}
+                  />
+                  <span style={cp.sensorScaleVal}>x{sensorScale[key].toFixed(2)}</span>
+                </div>
+                {/* 増加率スライダー（青）: delta × rate で増幅 */}
+                <div style={cp.sensorScaleRow}>
+                  <input
+                    type="range" min="0.1" max="5.0" step="0.05"
+                    value={sensorRate[key]}
+                    onChange={e => onSensorRate(key, parseFloat(e.target.value))}
+                    style={cp.sliderRate}
+                  />
+                  <span style={cp.sensorRateVal}>×{sensorRate[key].toFixed(2)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={cp.totalRow}>
+            合計: <span style={cp.totalVal}>{Math.round(total)}</span>
+          </div>
+        </div>
+
+        {/* 重心 (CoP) */}
+        <div style={cp.copWrap}>
+          <div style={cp.boardLabel}>重心 (CoP)</div>
+          <div style={cp.copGrid}>
+            <div style={cp.copItem}>
+              <span style={cp.copLabel}>X（左右）</span>
+              <span style={{ ...cp.copVal, color: Math.abs(cop.x) > 0.3 ? '#ffb74d' : '#4fc3f7' }}>
+                {cop.x.toFixed(3)}
+              </span>
+            </div>
+            <div style={cp.copItem}>
+              <span style={cp.copLabel}>Y（前後）</span>
+              <span style={{ ...cp.copVal, color: Math.abs(cop.y) > 0.3 ? '#ffb74d' : '#4fc3f7' }}>
+                {cop.y.toFixed(3)}
+              </span>
+            </div>
+          </div>
+          {/* 重心インジケーター */}
+          <div style={cp.indicator}>
+            <div style={cp.indicatorInner}>
+              <div style={cp.crossH} />
+              <div style={cp.crossV} />
+              <div style={{
+                ...cp.dot,
+                left: `calc(50% + ${cop.x * 40}%)`,
+                top:  `calc(50% - ${cop.y * 40}%)`,
+              }} />
+            </div>
+          </div>
+        </div>
+
+        {/* グローバル感度スライダー */}
+        <div style={cp.sensWrap}>
+          <div style={cp.boardLabel}>グローバル感度倍率</div>
+          <div style={cp.sensRow}>
+            <span style={cp.sensMin}>x1.0</span>
+            <input
+              type="range" min="1.0" max="5.0" step="0.1"
+              value={sensitivity}
+              onChange={e => onSensitivity(parseFloat(e.target.value))}
+              style={cp.slider}
+            />
+            <span style={cp.sensMax}>x5.0</span>
+          </div>
+          <div style={cp.sensVal}>
+            現在の感度:&ensp;
+            <span style={{ color: '#4fc3f7', fontWeight: 700 }}>x{sensitivity.toFixed(1)}</span>
+          </div>
+        </div>
+
+        <button
+          style={{ ...cp.calibBtn, background: calibrated ? '#1565c0' : '#1a4fc4' }}
+          onClick={handleCalib}
+        >
+          {calibrated ? '補正完了 ✓' : '現在の位置を原点に補正'}
+        </button>
+
+      </div>
+    </div>
+  )
+}
+
+const cp = {
+  overlay: {
+    position: 'fixed', inset: 0,
+    background: 'rgba(0,0,0,0.6)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    zIndex: 200,
+  },
+  modal: {
+    background: '#0e1f3d', border: '1px solid #1e3a6a',
+    borderRadius: 12, width: 420,
+    display: 'flex', flexDirection: 'column', gap: 16,
+    padding: '20px 24px',
+    boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
+  },
+  header: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+  },
+  title:    { fontSize: 16, fontWeight: 800, color: '#fff' },
+  closeBtn: {
+    background: 'none', border: 'none', color: '#666',
+    fontSize: 16, cursor: 'pointer', padding: '2px 6px',
+  },
+
+  boardWrap:  { display: 'flex', flexDirection: 'column', gap: 8 },
+  boardLabel: { fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em' },
+  boardGrid:  { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 },
+  sensorCell: {
+    background: '#071428', border: '1px solid #1e3a6a',
+    borderRadius: 8, padding: '10px 14px',
+    display: 'flex', flexDirection: 'column', gap: 4,
+  },
+  sensorLabel: { fontSize: 10, color: '#555' },
+  sensorVal:   { fontSize: 22, fontWeight: 700, color: '#fff', fontVariantNumeric: 'tabular-nums' },
+  totalRow:    { fontSize: 12, color: '#555', textAlign: 'right' },
+  totalVal:    { color: '#aaa', fontWeight: 700 },
+
+  copWrap: { display: 'flex', flexDirection: 'column', gap: 8 },
+  copGrid: { display: 'flex', gap: 12 },
+  copItem: {
+    flex: 1, background: '#071428', border: '1px solid #1e3a6a',
+    borderRadius: 8, padding: '8px 12px',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+  },
+  copLabel: { fontSize: 11, color: '#555' },
+  copVal:   { fontSize: 18, fontWeight: 700, fontVariantNumeric: 'tabular-nums' },
+
+  indicator: {
+    background: '#071428', border: '1px solid #1e3a6a',
+    borderRadius: 8, padding: 8,
+    display: 'flex', justifyContent: 'center',
+  },
+  indicatorInner: {
+    position: 'relative', width: 120, height: 80,
+    background: '#0a1828', borderRadius: 6,
+  },
+  crossH: {
+    position: 'absolute', left: 0, right: 0, top: '50%',
+    height: 1, background: '#1e3a6a',
+  },
+  crossV: {
+    position: 'absolute', top: 0, bottom: 0, left: '50%',
+    width: 1, background: '#1e3a6a',
+  },
+  dot: {
+    position: 'absolute',
+    width: 10, height: 10, borderRadius: '50%',
+    background: '#4fc3f7',
+    transform: 'translate(-50%, -50%)',
+    boxShadow: '0 0 6px #4fc3f7',
+    transition: 'left 0.05s, top 0.05s',
+  },
+
+  sensorScaleRow: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 },
+  sliderSmall:    { flex: 1, accentColor: '#f5c518', cursor: 'pointer', height: 14 },
+  sensorScaleVal: { fontSize: 10, color: '#f5c518', fontWeight: 700, flexShrink: 0, minWidth: 34, textAlign: 'right' },
+  sliderRate:     { flex: 1, accentColor: '#4fc3f7', cursor: 'pointer', height: 14 },
+  sensorRateVal:  { fontSize: 10, color: '#4fc3f7', fontWeight: 700, flexShrink: 0, minWidth: 34, textAlign: 'right' },
+
+  sensWrap: { display: 'flex', flexDirection: 'column', gap: 8 },
+  sensRow:  { display: 'flex', alignItems: 'center', gap: 10 },
+  sensMin:  { fontSize: 11, color: '#555', flexShrink: 0 },
+  sensMax:  { fontSize: 11, color: '#555', flexShrink: 0 },
+  slider:   { flex: 1, accentColor: '#4fc3f7', cursor: 'pointer' },
+  sensVal:  { fontSize: 12, color: '#888', textAlign: 'center' },
+
+  calibBtn: {
+    padding: '11px 0', borderRadius: 8, border: 'none',
+    color: '#fff', fontSize: 14, fontWeight: 700,
+    cursor: 'pointer', width: '100%',
+  },
+}
+
 // ── 難易度カラー ─────────────────────────────────────────
 const LABEL_COLOR = {
   '湖のように穏やか': '#4fc3f7',
@@ -150,13 +366,13 @@ const LABEL_COLOR = {
 // ── HomeScreen ───────────────────────────────────────────
 export default function HomeScreen({ onStart }) {
   const { downlink, supported } = useWifiStats()
-  const { connected, cop, copRef, connect, disconnect, calibrate } = useWiiBoard()
+  const { connected, sensors, cop, copRef, connect, disconnect, calibrate, sensitivity, setSensitivity, sensorScale, setSensorScale, sensorRate, setSensorRate } = useWiiBoard()
 
   const [playerName,    setPlayerName]    = useState('')
   const [selectedWifi,  setSelectedWifi]  = useState(null)
   const [rankings,      setRankings]      = useState([])
   const [showWifiModal, setShowWifiModal] = useState(false)
-  const [calibrateMsg,  setCalibrateMsg]  = useState(false)
+  const [showCalibPopup, setShowCalibPopup] = useState(false)
 
   useEffect(() => {
     getTopScores(10).then(setRankings)
@@ -175,11 +391,7 @@ export default function HomeScreen({ onStart }) {
     }
   }
 
-  const handleCalibrate = () => {
-    calibrate()
-    setCalibrateMsg(true)
-    setTimeout(() => setCalibrateMsg(false), 2000)
-  }
+  const handleCalibrate = () => setShowCalibPopup(true)
 
   return (
     <div style={s.root}>
@@ -303,11 +515,11 @@ export default function HomeScreen({ onStart }) {
           wii bord {connected ? '切断' : '接続'}
         </button>
         <button
-          style={{ ...s.navBtn, background: calibrateMsg ? '#1565c0' : '#5b40c9' }}
+          style={{ ...s.navBtn, background: '#5b40c9' }}
           onClick={handleCalibrate}
           disabled={!connected}
         >
-          wii bord補正{calibrateMsg ? ' ✓' : ''}
+          wii bord補正
         </button>
       </div>
 
@@ -316,6 +528,22 @@ export default function HomeScreen({ onStart }) {
         <WifiSelectModal
           onSelect={setSelectedWifi}
           onClose={() => setShowWifiModal(false)}
+        />
+      )}
+
+      {/* wii bord補正ポップアップ */}
+      {showCalibPopup && (
+        <CalibPopup
+          sensors={sensors}
+          cop={cop}
+          onCalibrate={calibrate}
+          sensitivity={sensitivity}
+          onSensitivity={setSensitivity}
+          sensorScale={sensorScale}
+          onSensorScale={setSensorScale}
+          sensorRate={sensorRate}
+          onSensorRate={setSensorRate}
+          onClose={() => setShowCalibPopup(false)}
         />
       )}
 
