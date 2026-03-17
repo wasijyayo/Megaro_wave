@@ -116,7 +116,31 @@ function CameraLookAt({ target }) {
   return null
 }
 
-export default function R3FGameCanvas({ waveParams, personCanvas, onElapsedTime }) {
+function CameraController({ lastAction }) {
+  const { camera } = useThree()
+  const targetY = useRef(2.8)
+
+  useFrame((state, delta) => {
+    const actionStr = lastAction?.label || lastAction
+    
+    // ポーズに応じて目標の高さを設定
+    if (actionStr === 'Jump') {
+      targetY.current = 4.5
+    } else if (actionStr === 'Squat') {
+      targetY.current = 1.2
+    } else {
+      targetY.current = 2.8
+    }
+
+    // カメラを滑らかに移動させる
+    camera.position.y = THREE.MathUtils.lerp(camera.position.y, targetY.current, 5.0 * delta)
+    camera.lookAt(CAMERA_TARGET[0], CAMERA_TARGET[1], CAMERA_TARGET[2])
+  })
+
+  return null
+}
+
+export default function R3FGameCanvas({ waveParams, personCanvas, onElapsedTime, lastAction }) {
   return (
     <Canvas
       style={{ position: 'absolute', inset: 0 }}
@@ -124,7 +148,7 @@ export default function R3FGameCanvas({ waveParams, personCanvas, onElapsedTime 
       gl={{ antialias: true, alpha: false }}
       dpr={[1, 2]}
     >
-      <CameraLookAt target={CAMERA_TARGET} />
+      <CameraController lastAction={lastAction} />
       <color attach="background" args={['#071428']} />
       <BackgroundScene />
       <WaveSurface waveParams={waveParams} onElapsedTime={onElapsedTime} />
@@ -141,3 +165,4 @@ export default function R3FGameCanvas({ waveParams, personCanvas, onElapsedTime 
     </Canvas>
   )
 }
+
