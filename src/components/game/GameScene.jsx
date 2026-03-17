@@ -20,8 +20,45 @@ export default function GameScene({ playerName, onGameOver }) {
   const { downlink }                          = useWifiStats()
   const { connected: boardConnected, copRef, connect: connectBoard } = useWiiBoard()
   
-  // ポーズ検知・セグメンテーション統合フック
-  const { canvas: personCanvas, status: poseStatus, poseData } = usePersonPoseAndSegmentation()
+  // ポーズ検知フック（骨格描画のみ）
+  const { canvas: poseCanvas, status: poseStatus, poseData } = usePersonPoseAndSegmentation()
+  // セグメンテーション（人物マスク・描画）フック
+  const { canvas: segCanvas, status: segStatus } = usePersonSegmentation()
+  // セグメント + ポーズを重ねる合成キャンバス
+  const [combinedCanvas] = useState(() => {
+    const c = document.createElement('canvas')
+    c.width = 720
+    c.height = 1280
+    return c
+  })
+
+  // segCanvas と poseCanvas を合成して combinedCanvas に書き込む
+  useEffect(() => {
+    let raf = 0
+    function loop() {
+      if (!segCanvas || !poseCanvas) {
+        raf = requestAnimationFrame(loop)
+        return
+      }
+
+      if (combinedCanvas.width !== segCanvas.width || combinedCanvas.height !== segCanvas.height) {
+        combinedCanvas.width = segCanvas.width
+        combinedCanvas.height = segCanvas.height
+      }
+
+      const ctx = combinedCanvas.getContext('2d')
+      if (!ctx) { raf = requestAnimationFrame(loop); return }
+      ctx.clearRect(0, 0, combinedCanvas.width, combinedCanvas.height)
+      // セグメント映像を下地に描画
+      ctx.drawImage(segCanvas, 0, 0, combinedCanvas.width, combinedCanvas.height)
+      // ポーズ（骨格）は上に重ねる
+      ctx.drawImage(poseCanvas, 0, 0, combinedCanvas.width, combinedCanvas.height)
+
+      raf = requestAnimationFrame(loop)
+    }
+    loop()
+    return () => cancelAnimationFrame(raf)
+  }, [segCanvas, poseCanvas, combinedCanvas])
 
   // ── UI state ──
   const [score,      setScore]      = useState(0)
@@ -146,7 +183,7 @@ export default function GameScene({ playerName, onGameOver }) {
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', background: '#000' }}>
       <R3FGameCanvas
         waveParams={getWaveParams(downlink)}
-        personCanvas={personCanvas}
+        personCanvas={combinedCanvas}
         onElapsedTime={(t) => { elapsedTimeRef.current = t }}
       />
 
@@ -160,7 +197,7 @@ export default function GameScene({ playerName, onGameOver }) {
         lastAction={lastAction}
       />
 
-      <div style={s.maskStatus}>{poseStatus}</div>
+      <div style={s.maskStatus}>{segStatus} / {poseStatus}</div>
 
       {/* Wii Board 接続ボタン */}
       {!boardConnected && (
