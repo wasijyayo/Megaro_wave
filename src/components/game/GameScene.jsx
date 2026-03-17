@@ -46,6 +46,11 @@ export default function GameScene({ playerName, onGameOver }) {
     boardConnectedRef.current = boardConnected
   }, [boardConnected])
 
+  const poseDataRef = useRef(null)
+  useEffect(() => {
+    poseDataRef.current = poseData
+  }, [poseData])
+
   // ── メインゲームループ ──
   useEffect(() => {
     let rafId
@@ -55,14 +60,15 @@ export default function GameScene({ playerName, onGameOver }) {
 
       const wpf          = waveParamsRef.current
       const elapsedTime = elapsedTimeRef.current
+      const currentPoseData = poseDataRef.current
 
       // ── ポーズ判定 (MediaPipe Landmarks) ──
       // しゃがみ(Squat): 膝(左右どちらか)が > 0.75
       // ジャンプ(Jump): 膝(左右どちらか)が < 0.5
       // 両手: 右腕(RIGHT_WRIST) < 右肩(RIGHT_SHOULDER) かつ 左腕(LEFT_WRIST) > 左肩(LEFT_SHOULDER)
       let actionLabel = null
-      if (poseData && poseData.landmarks && poseData.landmarks.length > 0) {
-        const lm = poseData.landmarks[0]
+      if (currentPoseData && currentPoseData.landmarks && currentPoseData.landmarks.length > 0) {
+        const lm = currentPoseData.landmarks[0]
         
         // MediaPipe Pose landmarks indices
         // 11: left shoulder, 12: right shoulder
@@ -134,7 +140,7 @@ export default function GameScene({ playerName, onGameOver }) {
 
     rafId = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(rafId)
-  }, [copRef, poseData, onGameOver])
+  }, [copRef, onGameOver])
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', background: '#000' }}>
