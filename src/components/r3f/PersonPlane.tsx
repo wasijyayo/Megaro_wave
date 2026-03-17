@@ -20,6 +20,8 @@ interface PersonPlaneProps {
   followWave?: boolean
   waveParams?: { amplitude?: number; frequency?: number; speed?: number }
   heightOffset?: number
+  // オブジェクト名　カメラがシーン内のオブジェクトを検索するために使用
+  objectName?: string
 }
 
 export default function PersonPlane({
@@ -32,6 +34,7 @@ export default function PersonPlane({
   followWave = false,
   waveParams = { amplitude: 0.5, frequency: 1.0, speed: 1.0 },
   heightOffset = 0,
+  objectName,
 }: PersonPlaneProps) {
   const meshRef = useRef<THREE.Mesh>(null)
 
@@ -60,7 +63,7 @@ export default function PersonPlane({
   })
 
   const plane = (
-    <mesh ref={meshRef} position={position} rotation={rotation} scale={scale}>
+    <mesh name={objectName ?? 'PersonPlane'} ref={meshRef} position={position} rotation={rotation} scale={scale}>
       <planeGeometry args={[ASPECT * PLANE_HEIGHT, PLANE_HEIGHT]} />
       <meshBasicMaterial
         map={texture}
