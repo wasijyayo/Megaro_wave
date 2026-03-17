@@ -3,6 +3,7 @@ import R3FGameCanvas  from './R3FGameCanvas.jsx'
 import HUD            from './HUD.jsx'
 import { useWifiStats }  from '../../hooks/useWifiStats.js'
 import { useWiiBoard }   from '../../hooks/useWiiBoard.js'
+import { usePersonPoseAndSegmentation } from '../../hooks/usePersonPoseAndSegmentation.ts'
 import { usePersonSegmentation } from '../../hooks/usePersonSegmentation.ts'
 import { getWaveParams, calcWaveTilt } from '../../utils/waveParams.js'
 
@@ -18,7 +19,9 @@ export default function GameScene({ playerName, onGameOver }) {
   // ── hooks ──
   const { downlink }                          = useWifiStats()
   const { connected: boardConnected, copRef, connect: connectBoard } = useWiiBoard()
-  const { canvas: personCanvas, status: personMaskStatus } = usePersonSegmentation()
+  
+  // ポーズ検知・セグメンテーション統合フック
+  const { canvas: personCanvas, status: poseStatus, poseData } = usePersonPoseAndSegmentation()
 
   // ── UI state ──
   const [score,      setScore]      = useState(0)
@@ -32,6 +35,7 @@ export default function GameScene({ playerName, onGameOver }) {
   const imbalanceStartRef    = useRef(null)
   const waveParamsRef        = useRef(getWaveParams(downlink))
   const boardConnectedRef    = useRef(false)
+  const lastActionRef        = useRef(null)
 
   // waveParams を ref に同期 (ゲームループ内で参照)
   useEffect(() => {
@@ -42,6 +46,11 @@ export default function GameScene({ playerName, onGameOver }) {
     boardConnectedRef.current = boardConnected
   }, [boardConnected])
 
+  const poseDataRef = useRef(null)
+  useEffect(() => {
+    poseDataRef.current = poseData
+  }, [poseData])
+
   // ── メインゲームループ ──
   useEffect(() => {
     let rafId
@@ -49,11 +58,59 @@ export default function GameScene({ playerName, onGameOver }) {
     const loop = (timestamp) => {
       rafId = requestAnimationFrame(loop)
 
-      const wp          = waveParamsRef.current
+      const wpf          = waveParamsRef.current
       const elapsedTime = elapsedTimeRef.current
+      const currentPoseData = poseDataRef.current
+
+      // ── ポーズ判定 (MediaPipe Landmarks) ──
+      // しゃがみ(Squat): 膝(左右どちらか)が > 0.75
+      // ジャンプ(Jump): 膝(左右どちらか)が < 0.5
+      // 両手: 右腕(RIGHT_WRIST) < 右肩(RIGHT_SHOULDER) かつ 左腕(LEFT_WRIST) > 左肩(LEFT_SHOULDER)
+      let actionLabel = null
+      if (currentPoseData && currentPoseData.landmarks && currentPoseData.landmarks.length > 0) {
+        const lm = currentPoseData.landmarks[0]
+        
+        // MediaPipe Pose landmarks indices
+        // 11: left shoulder, 12: right shoulder
+        // 15: left wrist, 16: right wrist
+        // 25: left knee, 26: right knee
+        
+        if (lm[25] && lm[26]) {
+          const kneeY = Math.min(lm[25].y, lm[26].y) // より上にある(値が小さい)方の膝を基準にする
+          const maxKneeY = Math.max(lm[25].y, lm[26].y) // より下にある(値が大きい)方の膝
+          
+          if (maxKneeY > 0.75) {
+            actionLabel = "Squat"
+          } else if (kneeY < 0.5) {
+            actionLabel = "Jump"
+          }
+        }
+        
+        if (!actionLabel && lm[11] && lm[12] && lm[15] && lm[16]) {
+          // 右手上げ: 右手首(16)のY < 右肩(12)のY   左手下げ: 左手首(15)のY > 左肩(11)のY
+          if (lm[16].y < lm[12].y && lm[15].y > lm[11].y) {
+            actionLabel = "Right Up, Left Down"
+          }
+        }
+      }
+
+      if (actionLabel && (!lastActionRef.current || lastActionRef.current.label !== actionLabel)) {
+        const newAction = { id: Date.now(), label: actionLabel, points: 500 }
+        lastActionRef.current = newAction
+        setLastAction(newAction)
+        
+        // アクションによるボーナス加算
+        scoreRef.current += 500
+        setScore(Math.floor(scoreRef.current))
+      } else if (!actionLabel && lastActionRef.current) {
+        lastActionRef.current = null
+        // 意図的に setLastAction(null) を呼ばないことでHUDのPopupを残すか、
+        // あるいは消すなら null をセット (表示時間が短くなるかも)
+        // ここでは一旦そのまま (HUD側のフェードアウト任せ or 次のアクションまで残す)
+      }
 
       // ── バランス判定 ──
-      const targetX = calcWaveTilt(wp.amplitude, wp.frequency, wp.speed, wp.turbulence, elapsedTime)
+      const targetX = calcWaveTilt(wpf.amplitude, wpf.frequency, wpf.speed, wpf.turbulence, elapsedTime)
       const copX    = boardConnectedRef.current ? copRef.current.x : 0
       const diff    = Math.abs(targetX - copX)
       const ok      = diff < BALANCE_TOLERANCE
@@ -75,7 +132,7 @@ export default function GameScene({ playerName, onGameOver }) {
       } else {
         imbalanceStartRef.current = null
         // バランス維持ボーナス (微量)
-        scoreRef.current += wp.difficultyMultiplier * 0.05
+        scoreRef.current += wpf.difficultyMultiplier * 0.05
         setScore(Math.floor(scoreRef.current))
       }
 
@@ -83,7 +140,7 @@ export default function GameScene({ playerName, onGameOver }) {
 
     rafId = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(rafId)
-  }, [copRef])
+  }, [copRef, onGameOver])
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', background: '#000' }}>
@@ -103,7 +160,7 @@ export default function GameScene({ playerName, onGameOver }) {
         lastAction={lastAction}
       />
 
-      <div style={s.maskStatus}>{personMaskStatus}</div>
+      <div style={s.maskStatus}>{poseStatus}</div>
 
       {/* Wii Board 接続ボタン */}
       {!boardConnected && (
@@ -119,12 +176,14 @@ const s = {
   maskStatus: {
     position: 'absolute', top: 12, left: 12,
     background: 'rgba(0,0,0,0.55)', color: '#fff',
-    padding: '4px 10px', borderRadius: 6, fontSize: 13, fontFamily: 'monospace',
-    pointerEvents: 'none',
+    padding: '8px 12px', borderRadius: 6, fontSize: 13, fontFamily: 'monospace',
+    pointerEvents: 'none', lineHeight: 1.5,
+    zIndex: 20,
   },
   boardBtn: {
     position: 'absolute', bottom: 20, right: 20,
     padding: '8px 18px', background: '#1a4fc4', color: '#fff',
     border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13,
+    zIndex: 20,
   },
 }

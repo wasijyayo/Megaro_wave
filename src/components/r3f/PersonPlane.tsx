@@ -4,7 +4,7 @@ import { TransformControls } from '@react-three/drei'
 import * as THREE from 'three'
 import { getWaveHeight } from '../../utils/waveParams'
 
-const ASPECT = 16 / 9
+const ASPECT = 9 / 16
 const PLANE_HEIGHT = 3.2 // units in scene
 
 export type TransformMode = 'translate' | 'rotate' | 'scale'

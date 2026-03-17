@@ -3,9 +3,9 @@ import { useEffect } from 'react'
 import BackgroundScene from '../r3f/BackgroundScene.tsx'
 
 const PERSON_TRANSFORM = {
-  position: [0, -0.35, 0.25],
-  rotation: [0, 0, 0],
-  scale: [1.15, 1.15, 1.15],
+  position: [0, -0.6, 0.25],
+  rotation: [-Math.atan2(2.8 - (-0.35), 7 - 0.25), 0, 0], // カメラの角度(見下ろし)に合わせて傾ける
+  scale: [3.4, 3.4, 3.4],
 }
 
 const CAMERA_TARGET = [0, -0.35, 0.25]
@@ -22,6 +22,18 @@ function CameraLookAt({ target }) {
   return null
 }
 
+function CameraController() {
+  const { camera } = useThree()
+
+  useEffect(() => {
+    camera.position.set(0, 2.8, 7)
+    camera.lookAt(CAMERA_TARGET[0], CAMERA_TARGET[1], CAMERA_TARGET[2])
+    camera.updateProjectionMatrix()
+  }, [camera])
+
+  return null
+}
+
 export default function R3FGameCanvas({ waveParams, personCanvas, onElapsedTime }) {
   return (
     <Canvas
@@ -30,9 +42,10 @@ export default function R3FGameCanvas({ waveParams, personCanvas, onElapsedTime 
       gl={{ antialias: true, alpha: false }}
       dpr={[1, 2]}
     >
-      <CameraLookAt target={CAMERA_TARGET} />
+      <CameraController />
       <color attach="background" args={['#071428']} />
       <BackgroundScene waveParams={waveParams} personCanvas={personCanvas} personTransform={PERSON_TRANSFORM} />
     </Canvas>
   )
 }
+
