@@ -444,7 +444,7 @@ const LABEL_COLOR = {
 }
 
 // ── HomeScreen ───────────────────────────────────────────
-export default function HomeScreen({ onStart, wiiBoard }) {
+export default function HomeScreen({ onStart, wiiBoard, onBattle }) {
   const user = useContext(UserContext)
   const { downlink, supported } = useWifiStats()
   const {
@@ -562,6 +562,9 @@ export default function HomeScreen({ onStart, wiiBoard }) {
           </div>
           <button style={s.startBtn} onClick={() => onStart()}>
             Game Start
+          </button>
+          <button style={s.battleBtn} onClick={onBattle}>
+            対戦モード
           </button>
         </div>
 
@@ -743,6 +746,11 @@ const s = {
     background: '#1a4fc4', color: '#fff', fontSize: 15, fontWeight: 700,
     cursor: 'pointer', boxShadow: '0 0 18px rgba(26,79,196,0.5)',
     width: '100%', maxWidth: 280,
+  },
+  battleBtn: {
+    padding: '11px 0', borderRadius: 8, border: '1px solid #1e3a6a',
+    background: 'none', color: '#8bb8ff', fontSize: 14, fontWeight: 700,
+    cursor: 'pointer', width: '100%', maxWidth: 280, marginTop: 8,
   },
 
   // ランキング
