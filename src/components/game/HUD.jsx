@@ -1,6 +1,15 @@
 const TOTAL_LIVES = 3
 
-export default function HUD({ score, lives, balance, waveLabel, difficultyMultiplier, lastAction }) {
+export default function HUD({
+  score,
+  lives,
+  balance,
+  waveLabel,
+  difficultyMultiplier,
+  lastAction,
+  targetPose,
+  targetPoseActive,
+}) {
   return (
     <div style={s.root}>
       {/* 左上: ライフ */}
@@ -24,8 +33,9 @@ export default function HUD({ score, lives, balance, waveLabel, difficultyMultip
         <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginTop: 2 }}>{waveLabel}</div>
       </div>
 
-      {/* 右上: スコア */}
-      <div style={{ position: 'absolute', top: 18, right: 20, textAlign: 'right' }}>
+      {/* 右上: スコア + 目標ポーズ */}
+      <div style={{ position: 'absolute', top: 18, right: 20, width: 200 }}>
+        <div style={{ textAlign: 'right' }}>
         <div style={s.label}>SCORE</div>
         <div style={{ fontSize: 34, fontWeight: 900, color: '#fff', lineHeight: 1, textShadow: '0 0 18px #00aaff' }}>
           {score.toLocaleString()}
@@ -33,6 +43,29 @@ export default function HUD({ score, lives, balance, waveLabel, difficultyMultip
         <div style={{ fontSize: 12, color: '#00aaff', marginTop: 2 }}>
           x{difficultyMultiplier.toFixed(1)} 倍率
         </div>
+        </div>
+
+        {targetPose && (
+          <div style={{
+            marginTop: 12,
+            padding: '10px 12px',
+            borderRadius: 12,
+            background: targetPoseActive ? 'rgba(68,255,136,0.22)' : 'rgba(0,0,0,0.5)',
+            border: `1px solid ${targetPoseActive ? '#44ff88' : 'rgba(255,255,255,0.14)'}`,
+            boxShadow: targetPoseActive ? '0 0 18px rgba(68,255,136,0.35)' : 'none',
+          }}>
+            <div style={{ ...s.label, textAlign: 'left' }}>TARGET POSE</div>
+            <div style={{ marginTop: 8, display: 'flex', justifyContent: 'center' }}>
+              <TargetPosePreview poseId={targetPose.id} active={targetPoseActive} />
+            </div>
+            <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: '#fff', textAlign: 'center' }}>
+              {targetPose.label}
+            </div>
+            <div style={{ marginTop: 4, fontSize: 12, color: targetPoseActive ? '#44ff88' : '#8bdcff', textAlign: 'center' }}>
+              成功で +{targetPose.points.toLocaleString()}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 下中央: バランスメーター */}
@@ -55,6 +88,80 @@ export default function HUD({ score, lives, balance, waveLabel, difficultyMultip
       )}
     </div>
   )
+}
+
+function TargetPosePreview({ poseId, active }) {
+  const stroke = active ? '#44ff88' : '#8bdcff'
+
+  // 共通パーツ: 頭・体幹
+  const head = <circle cx="48" cy="18" r="9" fill="none" stroke={stroke} strokeWidth="4" />
+  const torso = <path d="M48 27 L48 50" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+
+  switch (poseId) {
+    // ── 両手を頭の後ろ ──
+    case 'hands-behind-head':
+      return (
+        <svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true">
+          {head}{torso}
+          <path d="M48 34 L31 32" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M48 34 L65 32" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M31 32 Q38 24 43 22" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M65 32 Q58 24 53 22" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M43 24 L47 26" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" opacity="0.7" />
+          <path d="M53 24 L49 26" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" opacity="0.7" />
+          <path d="M48 50 L38 72" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M48 50 L58 72" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+        </svg>
+      )
+
+    // ── 両手を挙げる ──
+    case 'hands-up':
+      return (
+        <svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true">
+          {head}{torso}
+          {/* 両腕を真上に */}
+          <path d="M48 34 L36 28 L32 8" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M48 34 L60 28 L64 8" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          {/* 脚 */}
+          <path d="M48 50 L38 72" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M48 50 L58 72" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+        </svg>
+      )
+
+    // ── 敬礼 ──
+    case 'salute':
+      return (
+        <svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true">
+          {head}{torso}
+          {/* 右手: 額に当てる敬礼 */}
+          <path d="M48 34 L60 30 L56 16" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          {/* 左手: 体の横に下ろす */}
+          <path d="M48 34 L34 42 L30 56" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          {/* 脚 */}
+          <path d="M48 50 L42 72" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M48 50 L54 72" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+        </svg>
+      )
+
+    // ── ランニングマン ──
+    case 'running-man':
+      return (
+        <svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true">
+          {head}{torso}
+          {/* 右腕: 右上に伸ばす（一直線） */}
+          <path d="M48 34 L62 26 L76 14" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          {/* 曲げる腕: 肩から左下へ、肘で折り返して右上へ */}
+          <path d="M48 34 L38 44" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M38 44 L52 32" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          {/* 脚 */}
+          <path d="M48 50 L38 72" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M48 50 L58 72" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+        </svg>
+      )
+
+    default:
+      return null
+  }
 }
 
 function BalanceMeter({ balance }) {
