@@ -13,7 +13,13 @@ export default function App() {
   const [finalScore, setFinalScore] = useState(0)
 
   useEffect(() => {
-    return onAuth(firebaseUser => setUser(firebaseUser ?? null))
+    // 5秒以内に応答がなければ未ログイン扱いにしてフリーズを防ぐ
+    const timer = setTimeout(() => setUser(prev => prev === undefined ? null : prev), 5000)
+    const unsubscribe = onAuth(firebaseUser => {
+      clearTimeout(timer)
+      setUser(firebaseUser ?? null)
+    })
+    return () => { clearTimeout(timer); unsubscribe() }
   }, [])
 
   const handleStart = (name) => {
