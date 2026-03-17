@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Environment } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
@@ -104,100 +104,116 @@ const CyberParticles = ({ speed = 1.0 }: { speed?: number }) => {
   );
 };
 
-// 波のメッシュ
+// ── 波シェーダー（頂点変位を GPU で計算） ──────────────────
+const WAVE_VERT = /* glsl */`
+  uniform float uTime;
+  uniform float uAmplitude;
+  uniform float uFrequency;
+  uniform float uSpeed;
+
+  varying float vHeight;
+  varying vec3  vNormal_w;
+
+  void main() {
+    vec3 pos = position;
+    float arg  = pos.x * uFrequency + uTime * uSpeed;
+    pos.z      = sin(arg) * uAmplitude;
+    vHeight    = pos.z;
+
+    // 解析法線: surface z=sin(x*f+t*s)*A → ∂z/∂x = f*A*cos(arg)
+    float dzdx  = uFrequency * uAmplitude * cos(arg);
+    vec3  n     = normalize(vec3(-dzdx, 0.0, 1.0));
+    vNormal_w   = normalize(normalMatrix * n);
+
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+  }
+`;
+
+const WAVE_FRAG = /* glsl */`
+  uniform vec3  uBaseColor;
+  uniform float uAmplitude;
+
+  varying float vHeight;
+  varying vec3  vNormal_w;
+
+  void main() {
+    // 高さに応じて白化（波頭）
+    float threshold = uAmplitude * 0.6;
+    float falloff   = max(0.1, uAmplitude * 0.6);
+    float t = clamp((vHeight - (threshold - falloff)) / (falloff * 2.0), 0.0, 1.0);
+    vec3 color = mix(uBaseColor, vec3(1.0), t);
+
+    // シンプル Lambert 照明
+    vec3 lightDir = normalize(vec3(0.0, 1.0, 0.8));
+    float diff = max(dot(vNormal_w, lightDir), 0.0);
+    color *= (0.35 + 0.65 * diff);
+
+    gl_FragColor = vec4(color, 1.0);
+  }
+`;
+
+// ワイヤーフレームは同じ頂点変位、単色フラグメント
+const WIRE_FRAG = /* glsl */`
+  void main() {
+    gl_FragColor = vec4(0.0, 1.0, 1.0, 0.3);
+  }
+`;
+
+// 波のメッシュ（シェーダー版）
 const Ocean = ({ amplitude = 0.5, frequency = 1.0, speed = 1.0 }) => {
-  const meshRef = useRef<THREE.Mesh>(null);
-  
-  // ジオメトリを準備
-  const geometry = useMemo(() => new THREE.PlaneGeometry(30, 35, 64, 64), []);
-  
-  // ベース色と頂点カラー配列を準備
-  const baseColor = useMemo(() => new THREE.Color('#0066ff'), []);
-  const colorArray = useMemo(() => {
-    const count = geometry.attributes.position.count;
-    const arr = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      arr[i * 3] = baseColor.r;
-      arr[i * 3 + 1] = baseColor.g;
-      arr[i * 3 + 2] = baseColor.b;
-    }
-    geometry.setAttribute('color', new THREE.BufferAttribute(arr, 3));
-    return arr;
-  }, [geometry, baseColor]);
-  
-  // 初期位置を保存しておく
-  const initialPositions = useMemo(() => {
-    const positions = geometry.attributes.position;
-    const array = new Float32Array(positions.array.length);
-    for (let i = 0; i < positions.array.length; i++) {
-      array[i] = positions.array[i];
-    }
-    return array;
-  }, [geometry]);
+  // 頂点数: 33×33 = 1,089（旧 65×65 = 4,225 の約 1/4）
+  const geometry = useMemo(() => new THREE.PlaneGeometry(30, 35, 32, 32), []);
 
+  const waveUniforms = useMemo(() => ({
+    uTime:      { value: 0 },
+    uAmplitude: { value: amplitude },
+    uFrequency: { value: frequency },
+    uSpeed:     { value: speed },
+    uBaseColor: { value: new THREE.Color('#0066ff') },
+  }), []);
+
+  const wireUniforms = useMemo(() => ({
+    uTime:      { value: 0 },
+    uAmplitude: { value: amplitude },
+    uFrequency: { value: frequency },
+    uSpeed:     { value: speed },
+  }), []);
+
+  // waveParams が変わったら uniform を同期
+  useEffect(() => {
+    waveUniforms.uAmplitude.value = amplitude;
+    waveUniforms.uFrequency.value = frequency;
+    waveUniforms.uSpeed.value     = speed;
+    wireUniforms.uAmplitude.value = amplitude;
+    wireUniforms.uFrequency.value = frequency;
+    wireUniforms.uSpeed.value     = speed;
+  }, [amplitude, frequency, speed, waveUniforms, wireUniforms]);
+
+  // 毎フレームは uTime の float 1つだけ更新
   useFrame((state) => {
-    const time = state.clock.getElapsedTime();
-    const positions = geometry.attributes.position;
-    const colors = geometry.attributes.color as THREE.BufferAttribute;
-    
-    for (let i = 0; i < positions.count; i++) {
-      const x = initialPositions[i * 3];
-      const z = initialPositions[i * 3 + 1]; // PlaneGeometryは初期X-Y平面なので、2番目が実質Z軸方向
-      
-      const y = getWaveHeight(x, z, time, amplitude, frequency, speed);
-      positions.setZ(i, y); // 回転させる前なのでZを更新
-    }
-    positions.needsUpdate = true;
-    geometry.computeVertexNormals(); // これをやらないと光が変になる
-
-    // 頂点カラーを高さに応じて更新（波の上部を白くする）
-    if (colors) {
-      // 閾値とフェード幅（振幅に依存）
-      const peakThreshold = amplitude * 0.6; // ここを超えると白くなり始める
-      const falloff = Math.max(0.1, amplitude * 0.6);
-      for (let i = 0; i < positions.count; i++) {
-        const y = positions.getZ(i);
-        // スムースステップ的な補間: 0..1
-        let t = (y - (peakThreshold - falloff)) / (falloff * 2);
-        t = Math.max(0, Math.min(1, t));
-
-        // 線形補間で白へ近づける
-        const r = THREE.MathUtils.lerp(baseColor.r, 1.0, t);
-        const g = THREE.MathUtils.lerp(baseColor.g, 1.0, t);
-        const b = THREE.MathUtils.lerp(baseColor.b, 1.0, t);
-        colors.setXYZ(i, r, g, b);
-      }
-      colors.needsUpdate = true;
-    }
+    const t = state.clock.getElapsedTime();
+    waveUniforms.uTime.value = t;
+    wireUniforms.uTime.value = t;
   });
 
   return (
     <group rotation={[-Math.PI / 2, 0, 0]}>
-      {/* ベースとなる波のメッシュ（頂点カラーを使用） */}
-      <mesh ref={meshRef} geometry={geometry}>
-        <meshPhysicalMaterial 
-          vertexColors={true}
-          transmission={0.8}
-          opacity={1} 
-          metalness={0.2} 
-          roughness={0.1} 
-          ior={1.33} 
-          thickness={1.5} 
-          attenuationColor="#003399"
-          attenuationDistance={2}
-          envMapIntensity={1.0}
+      <mesh geometry={geometry}>
+        <shaderMaterial
+          vertexShader={WAVE_VERT}
+          fragmentShader={WAVE_FRAG}
+          uniforms={waveUniforms}
         />
       </mesh>
-      
-      {/* デジタルなグリッド線（ワイヤーフレーム）を波に重ねる */}
       <mesh geometry={geometry}>
-        <meshBasicMaterial 
-          color="#00ffff" /* シアンの電脳風カラー */
-          wireframe={true} 
-          transparent={true} 
-          opacity={0.3} 
-          blending={THREE.AdditiveBlending} 
+        <shaderMaterial
+          vertexShader={WAVE_VERT}
+          fragmentShader={WIRE_FRAG}
+          uniforms={wireUniforms}
+          wireframe
+          transparent
           depthWrite={false}
+          blending={THREE.AdditiveBlending}
         />
       </mesh>
     </group>
