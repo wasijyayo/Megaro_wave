@@ -3,6 +3,7 @@ import {
   getFirestore,
   collection,
   getDocs,
+  getDoc,
   doc,
   setDoc,
   orderBy,
@@ -88,23 +89,29 @@ export async function getWifiList(userName = 'guest') {
 }
 
 // ── スコア ───────────────────────────────────────────────
-// clea_date/{userName}  フィールド: score
+// clea_date/{userName}  フィールド: name, score
 
 /**
  * スコアを保存
- * @param {string} name
+ * @param {string} uid        ドキュメントID（user.uid）
+ * @param {string} userName   表示名（user.displayName ?? 'ゲスト'）
  * @param {number} score
  */
-export async function submitScore(name, score) {
+export async function submitScore(userName, score) {
   if (!isConfigured) {
     console.warn('[Firebase] 未設定のためスコアは保存されません')
     return
   }
   try {
-    await setDoc(doc(db, 'clea_date', name), {
+    const ref     = doc(db, 'clea_date', userName)
+    const current = await getDoc(ref)
+    // 既存スコアより高い場合のみ保存
+    if (current.exists() && current.data().score >= score) return
+    await setDoc(ref, {
+      name: userName,
       score,
       updatedAt: serverTimestamp(),
-    }, { merge: true })
+    })
   } catch (e) {
     console.error('[Firebase] submitScore failed:', e)
   }
@@ -113,7 +120,7 @@ export async function submitScore(name, score) {
 /**
  * ランキング上位N件を取得
  * @param {number} n
- * @returns {{ id: string, score: number }[]}
+ * @returns {{ id: string, name: string, score: number }[]}
  */
 export async function getTopScores(n = 10) {
   if (!isConfigured) return []

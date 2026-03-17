@@ -54,7 +54,7 @@ export default function App() {
     <UserContext.Provider value={user}>
       {screen === 'home'     && <HomeScreen onStart={handleStart} />}
       {screen === 'game'     && <GameScene  playerName={playerName} onGameOver={handleGameOver} />}
-      {screen === 'gameover' && <GameOver   score={finalScore} playerName={playerName} onRestart={handleRestart} />}
+      {screen === 'gameover' && <GameOver   score={finalScore} onRestart={handleRestart} />}
     </UserContext.Provider>
   )
 }
