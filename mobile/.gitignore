@@ -1,0 +1,21 @@
+# Environment
+.env
+.env.local
+
+# Dependencies
+node_modules/
+
+# Build
+android/build/
+android/app/build/
+android/.gradle/
+android/app/.cxx/
+android/local.properties
+ios/build/
+ios/Pods/
+
+# Metro
+.metro-health-check*
+
+# Logs
+*.log
