@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from 'react'
 import { getWifiList } from '../firebase.js'
 import { getWaveParams } from '../utils/waveParams.js'
+import { ssidToStrokeTotal } from '../utils/strokeCount.js'
 import { UserContext } from '../contexts/UserContext.js'
 
 const DIFFICULTY_OPTIONS = ['すべて', '湖のように穏やか', '穏やか', '普通', '荒れ', '嵐']
@@ -89,7 +90,11 @@ export default function WifiSelectModal({ onSelect, onClose }) {
               <div
                 key={wifi.ssid}
                 style={s.row}
-                onClick={() => { onSelect(wifi); onClose() }}
+                onClick={async () => {
+                  const strokeTotal = await ssidToStrokeTotal(wifi.ssid)
+                  onSelect({ ...wifi, strokeTotal })
+                  onClose()
+                }}
                 onMouseEnter={e => e.currentTarget.style.background = '#e0e0e0'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
