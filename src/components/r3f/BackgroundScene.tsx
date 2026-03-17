@@ -1,5 +1,6 @@
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { Environment, Sky } from '@react-three/drei';
 import * as THREE from 'three';
 import PersonPlane from './PersonPlane'
 import { getWaveHeight } from '../../utils/waveParams'
@@ -9,7 +10,7 @@ const Ocean = ({ amplitude = 0.5, frequency = 1.0, speed = 1.0 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   
   // ジオメトリを準備
-  const geometry = useMemo(() => new THREE.PlaneGeometry(10, 10, 32, 32), []);
+  const geometry = useMemo(() => new THREE.PlaneGeometry(100, 100, 128, 128), []);
   
   // 初期位置を保存しておく
   const initialPositions = useMemo(() => {
@@ -38,7 +39,18 @@ const Ocean = ({ amplitude = 0.5, frequency = 1.0, speed = 1.0 }) => {
 
   return (
     <mesh ref={meshRef} geometry={geometry} rotation={[-Math.PI / 2, 0, 0]}>
-      <meshStandardMaterial color="#0055ff" wireframe={false} roughness={0.1} metalness={0.5} />
+      <meshPhysicalMaterial 
+        color="#0066ff" 
+        transmission={0.8}
+        opacity={1} 
+        metalness={0.2} 
+        roughness={0.1} 
+        ior={1.33} 
+        thickness={1.5} 
+        attenuationColor="#003399"
+        attenuationDistance={2}
+        envMapIntensity={1.0}
+      />
     </mesh>
   );
 };
@@ -95,6 +107,10 @@ export default function BackgroundScene({
     <>
       <ambientLight intensity={0.5} />
       <directionalLight position={[0, 10, 5]} intensity={1} />
+      <directionalLight position={[-5, 5, -5]} intensity={0.5} color="#00ffff" />
+      
+      <Sky distance={450000} sunPosition={[0, 1, 0]} inclination={0} azimuth={0.25} turbidity={8} rayleigh={2} mieCoefficient={0.005} mieDirectionalG={0.8} />
+      <Environment preset="city" />
 
       {/* 海面 */}
       <Ocean {...params} />

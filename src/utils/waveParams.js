@@ -9,9 +9,9 @@ function lerp(a, b, t) {
 export function getWaveParams(downlink) {
   const t = Math.min(downlink, 100) / 100;
 
-  const amplitude = lerp(0.15, 100.8, t);//テストで100.8に変更中、最後は1.8へ戻す
-  const frequency = lerp(0.3, 100.8, t);
-  const speed = lerp(0.4, 300.0, t);
+  const amplitude = lerp(0.15, 1.8, t);
+  const frequency = lerp(0.3, 1.8, t);
+  const speed = lerp(0.4, 3.0, t);
   const turbulence = lerp(0.0, 1.0, t);
   const difficultyMultiplier = lerp(1.0, 5.0, t);
 

@@ -26,7 +26,7 @@ export default function R3FGameCanvas({ waveParams, personCanvas, onElapsedTime 
   return (
     <Canvas
       style={{ position: 'absolute', inset: 0 }}
-      camera={{ position: [0, 2.8, 7], fov: 60, near: 0.1, far: 100 }}
+      camera={{ position: [0, 1, 7], fov: 60, near: 0.1, far: 100 }}
       gl={{ antialias: true, alpha: false }}
       dpr={[1, 2]}
     >
