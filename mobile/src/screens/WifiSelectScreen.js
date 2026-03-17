@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useContext } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, ActivityIndicator,
   useWindowDimensions, StyleSheet,
@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useWifiList } from '../hooks/useWifi'
 import { getWaveParams, rssiToMbps } from '../utils/waveParams'
 import { saveWifiInfo, getWifiInfo } from '../firebase'
+import { UserContext } from '../contexts/UserContext'
 
 // 難易度フィルター選択肢
 const DIFFICULTY_OPTIONS = ['すべて', '湖のように穏やか', '穏やか', '普通', '荒れ', '嵐']
@@ -68,6 +69,7 @@ export default function WifiSelectScreen({ navigation }) {
   const insets    = useSafeAreaInsets()
   const isTablet  = width >= 768
 
+  const user = useContext(UserContext)
   const { list, status, error, scan } = useWifiList()
   const [filter,      setFilter]      = useState('すべて')
   const [showFilter,  setShowFilter]  = useState(false)
@@ -77,7 +79,7 @@ export default function WifiSelectScreen({ navigation }) {
 
   const loadSaved = async () => {
     setLoadingSaved(true)
-    const data = await getWifiInfo('guest')
+    const data = await getWifiInfo(user.displayName ?? user.uid)
     setSavedList(data)
     setLoadingSaved(false)
   }
@@ -99,7 +101,7 @@ export default function WifiSelectScreen({ navigation }) {
   // スキャン結果からFirebaseに保存
   const handleSave = async (item, mbps) => {
     setSaving(true)
-    await saveWifiInfo('guest', item.SSID, mbps)
+    await saveWifiInfo(user.displayName ?? user.uid, item.SSID, mbps)
     setSaving(false)
     loadSaved()
   }

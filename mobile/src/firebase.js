@@ -11,6 +11,17 @@ import {
   serverTimestamp,
 } from 'firebase/firestore'
 import {
+  initializeAuth,
+  getReactNativePersistence,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signInAnonymously,
+  signOut,
+  onAuthStateChanged,
+  updateProfile,
+} from 'firebase/auth'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import {
   FIREBASE_API_KEY,
   FIREBASE_AUTH_DOMAIN,
   FIREBASE_PROJECT_ID,
@@ -30,28 +41,55 @@ const firebaseConfig = {
 
 const isConfigured = !!FIREBASE_PROJECT_ID
 
-let db = null
+let app  = null
+let db   = null
+let auth = null
+
 if (isConfigured) {
-  const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
-  db = getFirestore(app)
+  app  = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
+  db   = getFirestore(app)
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage),
+  })
+}
+
+// ── Authentication ────────────────────────────────────────
+
+/** 新規登録（usernameをdisplayNameとして保存） */
+export async function register(email, password, username) {
+  const cred = await createUserWithEmailAndPassword(auth, email, password)
+  if (username) await updateProfile(cred.user, { displayName: username })
+  return cred
+}
+
+/** ログイン */
+export async function login(email, password) {
+  return signInWithEmailAndPassword(auth, email, password)
+}
+
+/** ゲストログイン（匿名認証） */
+export async function loginAsGuest() {
+  return signInAnonymously(auth)
+}
+
+/** ログアウト */
+export async function logout() {
+  return signOut(auth)
+}
+
+/** 認証状態の変化を監視（unsubscribe関数を返す） */
+export function onAuth(callback) {
+  if (!auth) return () => {}
+  return onAuthStateChanged(auth, callback)
 }
 
 // ── defalt コレクション ──────────────────────────────────
-// defalt/{userName}/wifi/{ssid}  フィールド: ssid, fast (Mbps)
+// defalt/{uid}/wifi/{ssid}  フィールド: ssid, fast (Mbps)
 
-/**
- * WiFi情報を保存（SSIDごとに別ドキュメント）
- * @param {string} userName
- * @param {string} ssid
- * @param {number} fast  通信速度 (Mbps)
- */
-export async function saveWifiInfo(userName, ssid, fast) {
-  if (!isConfigured) {
-    console.warn('[Firebase] 未設定のためWifi情報は保存されません')
-    return
-  }
+export async function saveWifiInfo(uid, ssid, fast) {
+  if (!isConfigured) return
   try {
-    await setDoc(doc(db, 'defalt', userName, 'wifi', ssid), {
+    await setDoc(doc(db, 'defalt', uid, 'wifi', ssid), {
       ssid,
       fast,
       updatedAt: serverTimestamp(),
@@ -61,15 +99,10 @@ export async function saveWifiInfo(userName, ssid, fast) {
   }
 }
 
-/**
- * ユーザーの保存済みWifi一覧を取得
- * @param {string} userName
- * @returns {{ ssid: string, fast: number }[]}
- */
-export async function getWifiInfo(userName) {
+export async function getWifiInfo(uid) {
   if (!isConfigured) return []
   try {
-    const snap = await getDocs(collection(db, 'defalt', userName, 'wifi'))
+    const snap = await getDocs(collection(db, 'defalt', uid, 'wifi'))
     return snap.docs.map(d => d.data())
   } catch (e) {
     console.error('[Firebase] getWifiInfo failed:', e)
@@ -78,20 +111,11 @@ export async function getWifiInfo(userName) {
 }
 
 // ── clea_date コレクション ───────────────────────────────
-// ドキュメントID = user_name, フィールド: score
 
-/**
- * スコアを保存
- * @param {string} userName
- * @param {number} score
- */
-export async function saveScore(userName, score) {
-  if (!isConfigured) {
-    console.warn('[Firebase] 未設定のためスコアは保存されません')
-    return
-  }
+export async function saveScore(uid, score) {
+  if (!isConfigured) return
   try {
-    await setDoc(doc(db, 'clea_date', userName), {
+    await setDoc(doc(db, 'clea_date', uid), {
       score,
       updatedAt: serverTimestamp(),
     }, { merge: true })
@@ -100,11 +124,6 @@ export async function saveScore(userName, score) {
   }
 }
 
-/**
- * スコアランキング上位N件を取得
- * @param {number} n
- * @returns {{ id: string, score: number }[]}
- */
 export async function getTopScores(n = 10) {
   if (!isConfigured) return []
   try {

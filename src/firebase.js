@@ -10,6 +10,15 @@ import {
   limit,
   serverTimestamp,
 } from 'firebase/firestore'
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signInAnonymously,
+  signOut,
+  onAuthStateChanged,
+  updateProfile,
+} from 'firebase/auth'
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
@@ -22,10 +31,38 @@ const firebaseConfig = {
 
 const isConfigured = !!firebaseConfig.projectId
 
-let db = null
+let db   = null
+let auth = null
+
 if (isConfigured) {
   const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
-  db = getFirestore(app)
+  db   = getFirestore(app)
+  auth = getAuth(app)
+}
+
+// ── Authentication ────────────────────────────────────────
+
+export async function register(email, password, username) {
+  const cred = await createUserWithEmailAndPassword(auth, email, password)
+  if (username) await updateProfile(cred.user, { displayName: username })
+  return cred
+}
+
+export async function login(email, password) {
+  return signInWithEmailAndPassword(auth, email, password)
+}
+
+export async function loginAsGuest() {
+  return signInAnonymously(auth)
+}
+
+export async function logout() {
+  return signOut(auth)
+}
+
+export function onAuth(callback) {
+  if (!auth) return () => {}
+  return onAuthStateChanged(auth, callback)
 }
 
 // ── WiFi一覧 ─────────────────────────────────────────────

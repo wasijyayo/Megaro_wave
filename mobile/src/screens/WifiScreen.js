@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState, useContext } from "react";
 import {
   View,
   Text,
@@ -11,12 +11,14 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useWifi } from "../hooks/useWifi";
 import { saveWifiInfo } from "../firebase";
+import { UserContext } from "../contexts/UserContext";
 
 export default function WifiScreen({ navigation }) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isTablet = width >= 768;
 
+  const user = useContext(UserContext)
   const { ssid, linkSpeed, frequency, status, error, fetch } = useWifi();
   const [saving, setSaving] = useState(false);
 
@@ -25,8 +27,7 @@ export default function WifiScreen({ navigation }) {
   const handleSave = async () => {
     if (!ssid) return;
     setSaving(true);
-    // TODO: ユーザー名をアプリ全体のstateから取得する場合はContextを使用
-    await saveWifiInfo("guest", ssid, linkSpeed ?? 0);
+    await saveWifiInfo(user.displayName ?? user.uid, ssid, linkSpeed ?? 0);
     setSaving(false);
     Alert.alert("保存完了", `${ssid} の情報を保存しました`, [
       { text: "OK", onPress: () => navigation.goBack() },
