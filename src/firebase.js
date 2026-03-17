@@ -61,7 +61,10 @@ export async function logout() {
 }
 
 export function onAuth(callback) {
-  if (!auth) return () => {}
+  if (!auth) {
+    callback(null)
+    return () => {}
+  }
   return onAuthStateChanged(auth, callback)
 }
 
