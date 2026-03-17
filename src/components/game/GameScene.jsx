@@ -1,11 +1,11 @@
-import { useState, useRef, useEffect } from 'react'
-import R3FGameCanvas  from './R3FGameCanvas.jsx'
-import HUD            from './HUD.jsx'
-import { useWifiStats }  from '../../hooks/useWifiStats.js'
-import { useWiiBoard }   from '../../hooks/useWiiBoard.js'
-import { usePersonPoseAndSegmentation } from '../../hooks/usePersonPoseAndSegmentation.ts'
-import { usePersonSegmentation } from '../../hooks/usePersonSegmentation.ts'
-import { getWaveParams, calcWaveTilt } from '../../utils/waveParams.js'
+import { useState, useRef, useEffect, useCallback } from "react";
+import R3FGameCanvas from "./R3FGameCanvas.jsx";
+import HUD from "./HUD.jsx";
+import { useWifiStats } from "../../hooks/useWifiStats.js";
+import { useWiiBoard } from "../../hooks/useWiiBoard.js";
+import { usePersonPoseAndSegmentation } from "../../hooks/usePersonPoseAndSegmentation.ts";
+import { usePersonSegmentation } from "../../hooks/usePersonSegmentation.ts";
+import { getWaveParams, calcWaveTilt } from "../../utils/waveParams.js";
 
 // ── 定数 ──────────────────────────────────────────────────
 const TOTAL_LIVES        = 3
@@ -147,53 +147,80 @@ function checkPose(poseId, lm) {
 
 // ─────────────────────────────────────────────────────────
 export default function GameScene({ playerName, onGameOver }) {
-  const elapsedTimeRef = useRef(0)
+  const elapsedTimeRef = useRef(0);
 
   // ── hooks ──
-  const { downlink }                          = useWifiStats()
-  const { connected: boardConnected, copRef, connect: connectBoard } = useWiiBoard()
-  
+  const { downlink } = useWifiStats();
+  const {
+    connected: boardConnected,
+    copRef,
+    connect: connectBoard,
+  } = useWiiBoard();
+
   // ポーズ検知フック（骨格描画のみ）
-  const { canvas: poseCanvas, status: poseStatus, poseData } = usePersonPoseAndSegmentation()
+  const {
+    canvas: poseCanvas,
+    status: poseStatus,
+    poseData,
+  } = usePersonPoseAndSegmentation();
   // セグメンテーション（人物マスク・描画）フック
-  const { canvas: segCanvas, status: segStatus } = usePersonSegmentation()
+  const { canvas: segCanvas, status: segStatus } = usePersonSegmentation();
   // セグメント + ポーズを重ねる合成キャンバス
   const [combinedCanvas] = useState(() => {
-    const c = document.createElement('canvas')
-    c.width = 720
-    c.height = 1280
-    return c
-  })
+    const c = document.createElement("canvas");
+    c.width = 720;
+    c.height = 1280;
+    return c;
+  });
 
   // segCanvas と poseCanvas を合成して combinedCanvas に書き込む
   useEffect(() => {
-    let raf = 0
+    let raf = 0;
     function loop() {
       if (!segCanvas || !poseCanvas) {
-        raf = requestAnimationFrame(loop)
-        return
+        raf = requestAnimationFrame(loop);
+        return;
       }
 
-      if (combinedCanvas.width !== segCanvas.width || combinedCanvas.height !== segCanvas.height) {
-        combinedCanvas.width = segCanvas.width
-        combinedCanvas.height = segCanvas.height
+      if (
+        combinedCanvas.width !== segCanvas.width ||
+        combinedCanvas.height !== segCanvas.height
+      ) {
+        combinedCanvas.width = segCanvas.width;
+        combinedCanvas.height = segCanvas.height;
       }
 
-      const ctx = combinedCanvas.getContext('2d')
-      if (!ctx) { raf = requestAnimationFrame(loop); return }
-      ctx.clearRect(0, 0, combinedCanvas.width, combinedCanvas.height)
+      const ctx = combinedCanvas.getContext("2d");
+      if (!ctx) {
+        raf = requestAnimationFrame(loop);
+        return;
+      }
+      ctx.clearRect(0, 0, combinedCanvas.width, combinedCanvas.height);
       // セグメント映像を下地に描画
-      ctx.drawImage(segCanvas, 0, 0, combinedCanvas.width, combinedCanvas.height)
+      ctx.drawImage(
+        segCanvas,
+        0,
+        0,
+        combinedCanvas.width,
+        combinedCanvas.height,
+      );
       // ポーズ（骨格）は上に重ねる
-      ctx.drawImage(poseCanvas, 0, 0, combinedCanvas.width, combinedCanvas.height)
+      ctx.drawImage(
+        poseCanvas,
+        0,
+        0,
+        combinedCanvas.width,
+        combinedCanvas.height,
+      );
 
-      raf = requestAnimationFrame(loop)
+      raf = requestAnimationFrame(loop);
     }
-    loop()
-    return () => cancelAnimationFrame(raf)
-  }, [segCanvas, poseCanvas, combinedCanvas])
+    loop();
+    return () => cancelAnimationFrame(raf);
+  }, [segCanvas, poseCanvas, combinedCanvas]);
 
   // ── UI state ──
+
   const [score,      setScore]      = useState(0)
   const [lives,      setLives]      = useState(TOTAL_LIVES)
   const [balance,    setBalance]    = useState({ copX: 0, targetX: 0, ok: true, boardConnected: false })
@@ -214,17 +241,17 @@ export default function GameScene({ playerName, onGameOver }) {
 
   // waveParams を ref に同期 (ゲームループ内で参照)
   useEffect(() => {
-    waveParamsRef.current = getWaveParams(downlink)
-  }, [downlink])
+    waveParamsRef.current = getWaveParams(downlink);
+  }, [downlink]);
 
   useEffect(() => {
-    boardConnectedRef.current = boardConnected
-  }, [boardConnected])
+    boardConnectedRef.current = boardConnected;
+  }, [boardConnected]);
 
-  const poseDataRef = useRef(null)
+  const poseDataRef = useRef(null);
   useEffect(() => {
-    poseDataRef.current = poseData
-  }, [poseData])
+    poseDataRef.current = poseData;
+  }, [poseData]);
 
   // currentPose を ref に同期
   useEffect(() => {
@@ -233,16 +260,17 @@ export default function GameScene({ playerName, onGameOver }) {
 
   // ── メインゲームループ ──
   useEffect(() => {
-    let rafId
+    let rafId;
 
     const loop = (timestamp) => {
-      rafId = requestAnimationFrame(loop)
+      rafId = requestAnimationFrame(loop);
 
-      const wpf          = waveParamsRef.current
-      const elapsedTime = elapsedTimeRef.current
-      const currentPoseData = poseDataRef.current
+      const wpf = waveParamsRef.current;
+      const elapsedTime = elapsedTimeRef.current;
+      const currentPoseData = poseDataRef.current;
 
       // ── ポーズ判定 (MediaPipe Landmarks) ──
+
       const activePose = currentPoseRef.current
       let detectedAction = null
       if (currentPoseData && currentPoseData.landmarks && currentPoseData.landmarks.length > 0) {
@@ -299,44 +327,64 @@ export default function GameScene({ playerName, onGameOver }) {
       }
 
       // ── バランス判定 ──
-      const targetX = calcWaveTilt(wpf.amplitude, wpf.frequency, wpf.speed, wpf.turbulence, elapsedTime)
-      const copX    = boardConnectedRef.current ? copRef.current.x : 0
-      const diff    = Math.abs(targetX - copX)
-      const ok      = diff < BALANCE_TOLERANCE
+      const targetX = calcWaveTilt(
+        wpf.amplitude,
+        wpf.frequency,
+        wpf.speed,
+        wpf.turbulence,
+        elapsedTime,
+      );
+      const copX = boardConnectedRef.current ? copRef.current.x : 0;
+      const diff = Math.abs(targetX - copX);
+      const ok = diff < BALANCE_TOLERANCE;
 
-      setBalance({ copX, targetX, ok, boardConnected: boardConnectedRef.current })
+      setBalance({
+        copX,
+        targetX,
+        ok,
+        boardConnected: boardConnectedRef.current,
+      });
 
       if (!ok) {
         if (!imbalanceStartRef.current) {
-          imbalanceStartRef.current = timestamp
+          imbalanceStartRef.current = timestamp;
         } else if (timestamp - imbalanceStartRef.current > IMBALANCE_TIMEOUT) {
-          imbalanceStartRef.current = null
-          livesRef.current -= 1
-          setLives(livesRef.current)
+          imbalanceStartRef.current = null;
+          livesRef.current -= 1;
+          setLives(livesRef.current);
           if (livesRef.current <= 0) {
-            onGameOver(Math.floor(scoreRef.current))
-            return
+            onGameOver(Math.floor(scoreRef.current));
+            return;
           }
         }
       } else {
-        imbalanceStartRef.current = null
+        imbalanceStartRef.current = null;
         // バランス維持ボーナス (微量)
-        scoreRef.current += wpf.difficultyMultiplier * 0.05
-        setScore(Math.floor(scoreRef.current))
+        scoreRef.current += wpf.difficultyMultiplier * 0.05;
+        setScore(Math.floor(scoreRef.current));
       }
+    };
 
-    }
-
-    rafId = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(rafId)
-  }, [copRef, onGameOver])
+    rafId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafId);
+  }, [copRef, onGameOver]);
 
   return (
-    <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', background: '#000' }}>
+    <div
+      style={{
+        position: "relative",
+        width: "100vw",
+        height: "100vh",
+        overflow: "hidden",
+        background: "#000",
+      }}
+    >
       <R3FGameCanvas
         waveParams={getWaveParams(downlink)}
         personCanvas={combinedCanvas}
-        onElapsedTime={(t) => { elapsedTimeRef.current = t }}
+        onElapsedTime={(t) => {
+          elapsedTimeRef.current = t;
+        }}
       />
 
       {/* レイヤー: HUD */}
@@ -351,7 +399,9 @@ export default function GameScene({ playerName, onGameOver }) {
         targetPoseActive={targetPoseActive}
       />
 
-      <div style={s.maskStatus}>{segStatus} / {poseStatus}</div>
+      <div style={s.maskStatus}>
+        {segStatus} / {poseStatus}
+      </div>
 
       {/* Wii Board 接続ボタン */}
       {!boardConnected && (
@@ -360,21 +410,35 @@ export default function GameScene({ playerName, onGameOver }) {
         </button>
       )}
     </div>
-  )
+  );
 }
 
 const s = {
   maskStatus: {
-    position: 'absolute', top: 12, left: 12,
-    background: 'rgba(0,0,0,0.55)', color: '#fff',
-    padding: '8px 12px', borderRadius: 6, fontSize: 13, fontFamily: 'monospace',
-    pointerEvents: 'none', lineHeight: 1.5,
+    position: "absolute",
+    top: 12,
+    left: 12,
+    background: "rgba(0,0,0,0.55)",
+    color: "#fff",
+    padding: "8px 12px",
+    borderRadius: 6,
+    fontSize: 13,
+    fontFamily: "monospace",
+    pointerEvents: "none",
+    lineHeight: 1.5,
     zIndex: 20,
   },
   boardBtn: {
-    position: 'absolute', bottom: 20, right: 20,
-    padding: '8px 18px', background: '#1a4fc4', color: '#fff',
-    border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13,
+    position: "absolute",
+    bottom: 20,
+    right: 20,
+    padding: "8px 18px",
+    background: "#1a4fc4",
+    color: "#fff",
+    border: "none",
+    borderRadius: 6,
+    cursor: "pointer",
+    fontSize: 13,
     zIndex: 20,
   },
-}
+};

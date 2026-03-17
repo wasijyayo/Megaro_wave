@@ -1,29 +1,33 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useContext } from 'react'
 import { submitScore, getTopScores } from '../../firebase.js'
+import { UserContext } from '../../contexts/UserContext.js'
 
-export default function GameOver({ score, playerName, onRestart }) {
-  const [scores,    setScores]    = useState([])
-  const [submitted, setSubmitted] = useState(false)
-  const [loading,   setLoading]   = useState(true)
+export default function GameOver({ score, onRestart }) {
+  const user = useContext(UserContext)
+  const userName = user?.displayName ?? (user?.isAnonymous ? 'ゲスト' : user?.email ?? '名無し')
+
+  const [scores,  setScores]  = useState([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function run() {
-      await submitScore(playerName, score)
-      setSubmitted(true)
+      if (user) {
+        await submitScore(userName, score)
+      }
       const top = await getTopScores(10)
       setScores(top)
       setLoading(false)
     }
     run()
-  }, [playerName, score])
+  }, [])
 
-  const playerRank = scores.findIndex((s) => s.name === playerName && s.score === score) + 1
+  const playerRank = scores.findIndex(s => s.id === user?.uid) + 1
 
   return (
     <div style={s.root}>
       <div style={s.inner}>
         <h2 style={s.title}>GAME OVER</h2>
-        <p style={s.name}>{playerName}</p>
+        <p style={s.name}>{userName}</p>
         <div style={s.score}>{score.toLocaleString()}</div>
         {playerRank > 0 && (
           <div style={s.rank}>ランキング #{playerRank}</div>
@@ -40,7 +44,7 @@ export default function GameOver({ score, playerName, onRestart }) {
             </div>
           ) : (
             scores.map((entry, i) => {
-              const isMe = entry.name === playerName && entry.score === score
+              const isMe = entry.id === user?.uid
               return (
                 <div key={entry.id} style={{ ...s.boardRow, color: isMe ? '#00aaff' : '#ccc' }}>
                   <span style={s.boardRank}>{i + 1}</span>
