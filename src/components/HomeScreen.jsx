@@ -465,7 +465,7 @@ export default function HomeScreen({ onStart, wiiBoard }) {
     applyHorizontalCalibration,
   } = wiiBoard
 
-  const [playerName,    setPlayerName]    = useState('')
+
   const [selectedWifi,  setSelectedWifi]  = useState(null)
   const [rankings,      setRankings]      = useState([])
   const [showWifiModal, setShowWifiModal] = useState(false)
@@ -557,14 +557,10 @@ export default function HomeScreen({ onStart, wiiBoard }) {
             </div>
           </div>
 
-          <input
-            value={playerName}
-            onChange={e => setPlayerName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && onStart(playerName.trim() || 'Player')}
-            placeholder="ユーザー名を入力"
-            style={s.input}
-          />
-          <button style={s.startBtn} onClick={() => onStart(playerName.trim() || 'Player')}>
+          <div style={s.userNameDisplay}>
+            {user?.displayName ?? (user?.isAnonymous ? 'ゲスト' : user?.email ?? '未ログイン')}
+          </div>
+          <button style={s.startBtn} onClick={() => onStart()}>
             Game Start
           </button>
         </div>
@@ -734,6 +730,13 @@ const s = {
     padding: '9px 13px', borderRadius: 8,
     border: '1px solid #334', background: '#0e1f3d',
     color: '#fff', fontSize: 14, outline: 'none',
+  },
+  userNameDisplay: {
+    padding: '9px 13px', borderRadius: 8,
+    border: '1px solid #334', background: '#0e1f3d',
+    color: '#7aadff', fontSize: 14,
+    width: '100%', maxWidth: 280, textAlign: 'center',
+    marginBottom: 8,
   },
   startBtn: {
     padding: '11px 0', borderRadius: 8, border: 'none',

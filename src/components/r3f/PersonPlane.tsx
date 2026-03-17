@@ -49,6 +49,7 @@ export default function PersonPlane({
   const groupRef = useRef<THREE.Group>(null)
   const meshRef = useRef<THREE.Mesh>(null)
   const surfboardRef = useRef<THREE.Mesh>(null)
+  const appliedWaveOffsetRef = useRef(0)
 
   const texture = useMemo(() => {
     const t = new THREE.CanvasTexture(canvas)
@@ -94,6 +95,11 @@ export default function PersonPlane({
         sr.x = THREE.MathUtils.lerp(sr.x, baseX + targetX * 0.9, 0.12)
         sr.z = THREE.MathUtils.lerp(sr.z, targetZ * 0.9, 0.12)
       }
+      const baseY = pos.y - appliedWaveOffsetRef.current
+      const waveDelta = getWaveHeight(x, z, time, amplitude, frequency, speed)
+      const nextWaveOffset = waveDelta + heightOffset
+      meshRef.current.position.y = baseY + nextWaveOffset
+      appliedWaveOffsetRef.current = nextWaveOffset
     }
   })
 

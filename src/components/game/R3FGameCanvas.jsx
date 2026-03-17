@@ -3,13 +3,14 @@ import { useEffect } from 'react'
 import * as THREE from 'three'
 import BackgroundScene from '../r3f/BackgroundScene.tsx'
 
-const PERSON_TRANSFORM = {
-  position: [0, -0.6, 0.25],
-  rotation: [-Math.atan2(2.8 - (-0.35), 7 - 0.25), 0, 0], // カメラの角度(見下ろし)に合わせて傾ける
-  scale: [3.4, 3.4, 3.4],
-}
-
+const CAMERA_POSITION = [0, 3.6, 7]
 const CAMERA_TARGET = [0, -0.35, 0.25]
+
+const PERSON_TRANSFORM = {
+  position: [0, -0.6, 1.8],
+  rotation: [-Math.atan2(CAMERA_POSITION[1] - CAMERA_TARGET[1], CAMERA_POSITION[2] - CAMERA_TARGET[2]), 0, 0],
+  scale: [2.25, 1.7, 1.7],
+}
 
 
 function CameraLookAt({ target, targetName = 'PersonPlane' }) {
@@ -34,10 +35,18 @@ function CameraController() {
   const { camera } = useThree()
 
   useEffect(() => {
-    camera.position.set(0, 2.8, 7)
+    camera.position.set(...CAMERA_POSITION)
     camera.lookAt(CAMERA_TARGET[0], CAMERA_TARGET[1], CAMERA_TARGET[2])
     camera.updateProjectionMatrix()
   }, [camera])
+
+  return null
+}
+
+function ElapsedTimeReporter({ onElapsedTime }) {
+  useFrame((state) => {
+    onElapsedTime?.(state.clock.getElapsedTime())
+  })
 
   return null
 }
@@ -46,11 +55,12 @@ export default function R3FGameCanvas({ waveParams, personCanvas, onElapsedTime 
   return (
     <Canvas
       style={{ position: 'absolute', inset: 0 }}
-      camera={{ position: [-0.5, 5, 10], fov: 60, near: 0.1, far: 100 }}
+      camera={{ position: CAMERA_POSITION, fov: 60, near: 0.1, far: 100 }}
       gl={{ antialias: true, alpha: false }}
       dpr={[1, 2]}
     >
       <CameraController />
+      <ElapsedTimeReporter onElapsedTime={onElapsedTime} />
       <color attach="background" args={['#071428']} />
       <BackgroundScene waveParams={waveParams} personCanvas={personCanvas} personTransform={PERSON_TRANSFORM} />
     </Canvas>

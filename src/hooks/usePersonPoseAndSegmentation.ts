@@ -11,6 +11,28 @@ const WASM_URL =
 const MODEL_URL =
   'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task'
 
+function getCenterCropRect(video: HTMLVideoElement, targetWidth: number, targetHeight: number) {
+  const vRatio = video.videoWidth / video.videoHeight
+  const cRatio = targetWidth / targetHeight
+
+  let sx = 0
+  let sy = 0
+  let sW = video.videoWidth
+  let sH = video.videoHeight
+
+  if (vRatio > cRatio) {
+    sH = video.videoHeight
+    sW = sH * cRatio
+    sx = (video.videoWidth - sW) / 2
+  } else {
+    sW = video.videoWidth
+    sH = sW / cRatio
+    sy = (video.videoHeight - sH) / 2
+  }
+
+  return { sx, sy, sW, sH }
+}
+
 export function usePersonPoseAndSegmentation() {
   const [canvas] = useState<HTMLCanvasElement>(() => {
     const c = document.createElement('canvas')
@@ -70,6 +92,12 @@ export function usePersonPoseAndSegmentation() {
             }
 
             const ctx = canvas.getContext('2d')!
+            const crop = getCenterCropRect(video, canvas.width, canvas.height)
+            const projectLandmark = (x: number, y: number) => ({
+              x: ((x * video.videoWidth) - crop.sx) * (canvas.width / crop.sW),
+              y: ((y * video.videoHeight) - crop.sy) * (canvas.height / crop.sH),
+            })
+
             // 透明なオーバーレイとして骨格のみ描画するため背景はクリアのみ
             ctx.clearRect(0, 0, canvas.width, canvas.height)
 
@@ -139,8 +167,10 @@ export function usePersonPoseAndSegmentation() {
               ctx.beginPath()
               connections.forEach(([i, j]) => {
                 if (lm[i] && lm[j]) {
-                  ctx.moveTo(lm[i].x * canvas.width, lm[i].y * canvas.height)
-                  ctx.lineTo(lm[j].x * canvas.width, lm[j].y * canvas.height)
+                  const from = projectLandmark(lm[i].x, lm[i].y)
+                  const to = projectLandmark(lm[j].x, lm[j].y)
+                  ctx.moveTo(from.x, from.y)
+                  ctx.lineTo(to.x, to.y)
                 }
               })
               ctx.stroke()
@@ -149,8 +179,9 @@ export function usePersonPoseAndSegmentation() {
               ctx.fillStyle = '#00ff00'
               for (let i = 0; i < lm.length; i++) {
                 const pt = lm[i]
+                const projected = projectLandmark(pt.x, pt.y)
                 ctx.beginPath()
-                ctx.arc(pt.x * canvas.width, pt.y * canvas.height, 4, 0, 2 * Math.PI)
+                ctx.arc(projected.x, projected.y, 4, 0, 2 * Math.PI)
                 ctx.fill()
               }
             }
