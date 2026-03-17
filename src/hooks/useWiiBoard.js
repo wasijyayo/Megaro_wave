@@ -34,6 +34,7 @@ export function useWiiBoard() {
   const sensorRateRef     = useRef({ ...DEFAULT_RATE })
   const horizontalCalibRef = useRef({ center: 0, scale: 1 }) // 左右方向用の自動補正パラメータ
   const deviceRef         = useRef(null)
+  const keepaliveRef      = useRef(null)
 
   const connect = useCallback(async () => {
     if (!('hid' in navigator)) return false
@@ -97,8 +98,16 @@ export function useWiiBoard() {
         setCoP(calibrated)
       })
 
-      await device.sendReport(0x15, new Uint8Array([0x00]))
+      // LED 1 を点灯（スリープ防止）
+      await device.sendReport(0x11, new Uint8Array([0x10]))
       await device.sendReport(0x12, new Uint8Array([0x04, 0x32]))
+
+      // keepalive: 10秒ごとにレポートモードを再送してスリープ・レート低下を防ぐ
+      keepaliveRef.current = setInterval(async () => {
+        try {
+          await device.sendReport(0x12, new Uint8Array([0x04, 0x32]))
+        } catch { /* 切断済みなら無視 */ }
+      }, 10_000)
 
       return true
     } catch (e) {
@@ -108,6 +117,8 @@ export function useWiiBoard() {
   }, [])
 
   const disconnect = useCallback(async () => {
+    clearInterval(keepaliveRef.current)
+    keepaliveRef.current = null
     const device = deviceRef.current
     if (!device) return
     if (device.opened) await device.close()

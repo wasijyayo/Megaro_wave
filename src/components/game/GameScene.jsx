@@ -8,151 +8,194 @@ import { usePersonSegmentation } from "../../hooks/usePersonSegmentation.ts";
 import { getWaveParams, calcWaveTilt } from "../../utils/waveParams.js";
 
 // ── 定数 ──────────────────────────────────────────────────
-const TOTAL_LIVES        = 3
-const BALANCE_TOLERANCE  = 0.28   // CoP と目標傾きの許容差 (-1〜1)
-const IMBALANCE_TIMEOUT  = 2000   // ms: この時間超えるとライフ -1
+const TOTAL_LIVES = 3;
+const BALANCE_TOLERANCE = 1.28; // CoP と目標傾きの許容差 (-1〜1)
+const IMBALANCE_TIMEOUT = 2000; // ms: この時間超えるとライフ -1
 // ── ポーズ定義 ──────────────────────────────────────────
 const POSE_LIST = [
-  { id: 'hands-behind-head', label: '両手を頭の後ろ', points: 1000 },
-  { id: 'hands-up',          label: '両手を挙げる',   points: 1000 },
-  { id: 'salute',            label: '敬礼',           points: 1000 },
-  { id: 'running-man',       label: 'ランニングマン', points: 1000 },
-]
+  { id: "hands-behind-head", label: "両手を頭の後ろ", points: 1000 },
+  { id: "hands-up", label: "両手を挙げる", points: 1000 },
+  { id: "salute", label: "敬礼", points: 1000 },
+  { id: "running-man", label: "ランニングマン", points: 1000 },
+];
 
 /** 現在と異なるランダムなポーズを返す */
 function pickRandomPose(currentId) {
-  const candidates = POSE_LIST.filter(p => p.id !== currentId)
-  return candidates[Math.floor(Math.random() * candidates.length)]
+  const candidates = POSE_LIST.filter((p) => p.id !== currentId);
+  return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
 // ── ポーズ判定関数 ─────────────────────────────────────
 
 /** 両手を頭の後ろに組む */
 function isHandsBehindHeadPose(lm) {
-  if (!lm?.[7] || !lm?.[8] || !lm?.[11] || !lm?.[12] || !lm?.[13] || !lm?.[14] || !lm?.[15] || !lm?.[16]) {
-    return false
+  if (
+    !lm?.[7] ||
+    !lm?.[8] ||
+    !lm?.[11] ||
+    !lm?.[12] ||
+    !lm?.[13] ||
+    !lm?.[14] ||
+    !lm?.[15] ||
+    !lm?.[16]
+  ) {
+    return false;
   }
-  const leftShoulder = lm[11], rightShoulder = lm[12]
-  const leftElbow = lm[13],    rightElbow = lm[14]
-  const leftWrist = lm[15],    rightWrist = lm[16]
-  const leftEar = lm[7],       rightEar = lm[8]
-  const shoulderY = (leftShoulder.y + rightShoulder.y) / 2
+  const leftShoulder = lm[11],
+    rightShoulder = lm[12];
+  const leftElbow = lm[13],
+    rightElbow = lm[14];
+  const leftWrist = lm[15],
+    rightWrist = lm[16];
+  const leftEar = lm[7],
+    rightEar = lm[8];
+  const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
 
   const leftWristNearHead =
     leftWrist.y < shoulderY + 0.08 &&
     Math.abs(leftWrist.x - leftEar.x) < 0.12 &&
-    Math.abs(leftWrist.y - leftEar.y) < 0.14
+    Math.abs(leftWrist.y - leftEar.y) < 0.14;
   const rightWristNearHead =
     rightWrist.y < shoulderY + 0.08 &&
     Math.abs(rightWrist.x - rightEar.x) < 0.12 &&
-    Math.abs(rightWrist.y - rightEar.y) < 0.14
+    Math.abs(rightWrist.y - rightEar.y) < 0.14;
   const elbowsRaised =
     leftElbow.y < leftShoulder.y + 0.12 &&
-    rightElbow.y < rightShoulder.y + 0.12
+    rightElbow.y < rightShoulder.y + 0.12;
 
-  return leftWristNearHead && rightWristNearHead && elbowsRaised
+  return leftWristNearHead && rightWristNearHead && elbowsRaised;
 }
 
 /** 両手を挙げる — 両手首が鼻より上、肘も肩より上 */
 function isHandsUpPose(lm) {
-  if (!lm?.[0] || !lm?.[11] || !lm?.[12] || !lm?.[13] || !lm?.[14] || !lm?.[15] || !lm?.[16]) {
-    return false
+  if (
+    !lm?.[0] ||
+    !lm?.[11] ||
+    !lm?.[12] ||
+    !lm?.[13] ||
+    !lm?.[14] ||
+    !lm?.[15] ||
+    !lm?.[16]
+  ) {
+    return false;
   }
-  const nose = lm[0]
-  const leftShoulder = lm[11], rightShoulder = lm[12]
-  const leftElbow = lm[13],    rightElbow = lm[14]
-  const leftWrist = lm[15],    rightWrist = lm[16]
+  const nose = lm[0];
+  const leftShoulder = lm[11],
+    rightShoulder = lm[12];
+  const leftElbow = lm[13],
+    rightElbow = lm[14];
+  const leftWrist = lm[15],
+    rightWrist = lm[16];
 
-  const bothWristsAboveHead = leftWrist.y < nose.y && rightWrist.y < nose.y
+  const bothWristsAboveHead = leftWrist.y < nose.y && rightWrist.y < nose.y;
   const bothElbowsAboveShoulders =
-    leftElbow.y < leftShoulder.y &&
-    rightElbow.y < rightShoulder.y
+    leftElbow.y < leftShoulder.y && rightElbow.y < rightShoulder.y;
 
-  return bothWristsAboveHead && bothElbowsAboveShoulders
+  return bothWristsAboveHead && bothElbowsAboveShoulders;
 }
 
 /** 敬礼 — 右手首が右目付近、左腕は下がっている */
 function isSalutePose(lm) {
-  if (!lm?.[5] || !lm?.[11] || !lm?.[12] || !lm?.[14] || !lm?.[15] || !lm?.[16]) {
-    return false
+  if (
+    !lm?.[5] ||
+    !lm?.[11] ||
+    !lm?.[12] ||
+    !lm?.[14] ||
+    !lm?.[15] ||
+    !lm?.[16]
+  ) {
+    return false;
   }
-  const rightEye = lm[5]
-  const leftShoulder = lm[11], rightShoulder = lm[12]
-  const rightElbow = lm[14]
-  const leftWrist = lm[15], rightWrist = lm[16]
+  const rightEye = lm[5];
+  const leftShoulder = lm[11],
+    rightShoulder = lm[12];
+  const rightElbow = lm[14];
+  const leftWrist = lm[15],
+    rightWrist = lm[16];
 
   // 右手首が右目の近く
   const rightWristNearEye =
     Math.abs(rightWrist.x - rightEye.x) < 0.12 &&
-    Math.abs(rightWrist.y - rightEye.y) < 0.12
+    Math.abs(rightWrist.y - rightEye.y) < 0.12;
   // 右肘が肩より高い
-  const rightElbowRaised = rightElbow.y < rightShoulder.y + 0.1
+  const rightElbowRaised = rightElbow.y < rightShoulder.y + 0.1;
   // 左手首が肩より下
-  const leftArmDown = leftWrist.y > leftShoulder.y + 0.1
+  const leftArmDown = leftWrist.y > leftShoulder.y + 0.1;
 
-  return rightWristNearEye && rightElbowRaised && leftArmDown
+  return rightWristNearEye && rightElbowRaised && leftArmDown;
 }
 
 /** ランニングマン（ボルトポーズ） — 両腕を右上に向け、右腕を伸ばし左肘を曲げる */
 function isRunningManPose(lm) {
-  if (!lm?.[11] || !lm?.[12] || !lm?.[13] || !lm?.[14] || !lm?.[15] || !lm?.[16]) {
-    return false
+  if (
+    !lm?.[11] ||
+    !lm?.[12] ||
+    !lm?.[13] ||
+    !lm?.[14] ||
+    !lm?.[15] ||
+    !lm?.[16]
+  ) {
+    return false;
   }
-  const leftShoulder = lm[11], rightShoulder = lm[12]
-  const leftElbow = lm[13],    rightElbow = lm[14]
-  const leftWrist = lm[15],    rightWrist = lm[16]
+  const leftShoulder = lm[11],
+    rightShoulder = lm[12];
+  const leftElbow = lm[13],
+    rightElbow = lm[14];
+  const leftWrist = lm[15],
+    rightWrist = lm[16];
 
   // 両腕が同じ方向（右上）を向いている: 両手首が体の中心より同じ側にある
-  const shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2
+  const shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
   const bothArmsToOneSide =
     (leftWrist.x < shoulderCenterX && rightWrist.x < shoulderCenterX) ||
-    (leftWrist.x > shoulderCenterX && rightWrist.x > shoulderCenterX)
+    (leftWrist.x > shoulderCenterX && rightWrist.x > shoulderCenterX);
 
   // 両手首が肩より上にある
-  const shoulderY = (leftShoulder.y + rightShoulder.y) / 2
+  const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
   const bothWristsRaised =
-    leftWrist.y < shoulderY + 0.05 &&
-    rightWrist.y < shoulderY + 0.05
+    leftWrist.y < shoulderY + 0.05 && rightWrist.y < shoulderY + 0.05;
 
   // 片方の肘が曲がっている（手首と肩の距離が短い ≒ 肘が曲がっている）
   const leftArmBent =
     Math.abs(leftWrist.x - leftShoulder.x) < 0.15 &&
-    leftElbow.y < leftShoulder.y + 0.05
-  const rightArmExtended =
-    Math.abs(rightWrist.x - rightShoulder.x) > 0.1
+    leftElbow.y < leftShoulder.y + 0.05;
+  const rightArmExtended = Math.abs(rightWrist.x - rightShoulder.x) > 0.1;
   // または逆パターン
   const rightArmBent =
     Math.abs(rightWrist.x - rightShoulder.x) < 0.15 &&
-    rightElbow.y < rightShoulder.y + 0.05
-  const leftArmExtended =
-    Math.abs(leftWrist.x - leftShoulder.x) > 0.1
+    rightElbow.y < rightShoulder.y + 0.05;
+  const leftArmExtended = Math.abs(leftWrist.x - leftShoulder.x) > 0.1;
 
   const boltPose =
-    (leftArmBent && rightArmExtended) ||
-    (rightArmBent && leftArmExtended)
+    (leftArmBent && rightArmExtended) || (rightArmBent && leftArmExtended);
 
-  return bothArmsToOneSide && bothWristsRaised && boltPose
+  return bothArmsToOneSide && bothWristsRaised && boltPose;
 }
 
 /** ポーズIDに応じた判定関数のディスパッチ */
 function checkPose(poseId, lm) {
   switch (poseId) {
-    case 'hands-behind-head': return isHandsBehindHeadPose(lm)
-    case 'hands-up':          return isHandsUpPose(lm)
-    case 'salute':            return isSalutePose(lm)
-    case 'running-man':       return isRunningManPose(lm)
-    default:                  return false
+    case "hands-behind-head":
+      return isHandsBehindHeadPose(lm);
+    case "hands-up":
+      return isHandsUpPose(lm);
+    case "salute":
+      return isSalutePose(lm);
+    case "running-man":
+      return isRunningManPose(lm);
+    default:
+      return false;
   }
 }
 
 // ─────────────────────────────────────────────────────────
 export default function GameScene({ playerName, onGameOver, wiiBoard }) {
-  const elapsedTimeRef = useRef(0)
+  const elapsedTimeRef = useRef(0);
 
   // ── hooks ──
-  const { downlink }                          = useWifiStats()
-  const { connected: boardConnected, copRef, connect: connectBoard } = wiiBoard
-  
+  const { downlink } = useWifiStats();
+  const { connected: boardConnected, copRef, connect: connectBoard } = wiiBoard;
+
   // ポーズ検知フック（骨格描画のみ）
   const {
     canvas: poseCanvas,
@@ -217,23 +260,30 @@ export default function GameScene({ playerName, onGameOver, wiiBoard }) {
 
   // ── UI state ──
 
-  const [score,      setScore]      = useState(0)
-  const [lives,      setLives]      = useState(TOTAL_LIVES)
-  const [balance,    setBalance]    = useState({ copX: 0, targetX: 0, ok: true, boardConnected: false })
-  const [lastAction, setLastAction] = useState(null)
-  const [targetPoseActive, setTargetPoseActive] = useState(false)
+  const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(TOTAL_LIVES);
+  const [balance, setBalance] = useState({
+    copX: 0,
+    targetX: 0,
+    ok: true,
+    boardConnected: false,
+  });
+  const [lastAction, setLastAction] = useState(null);
+  const [targetPoseActive, setTargetPoseActive] = useState(false);
   // ── ランダムポーズ管理 ──
-  const [currentPose, setCurrentPose] = useState(() => POSE_LIST[Math.floor(Math.random() * POSE_LIST.length)])
+  const [currentPose, setCurrentPose] = useState(
+    () => POSE_LIST[Math.floor(Math.random() * POSE_LIST.length)],
+  );
 
   // ── ゲームロジック用 refs (state 更新による effect 再起動を避ける) ──
-  const scoreRef             = useRef(0)
-  const livesRef             = useRef(TOTAL_LIVES)
-  const imbalanceStartRef    = useRef(null)
-  const waveParamsRef        = useRef(getWaveParams(downlink))
-  const boardConnectedRef    = useRef(false)
-  const lastActionRef        = useRef(null)
-  const targetPoseActiveRef  = useRef(false)
-  const currentPoseRef       = useRef(currentPose)
+  const scoreRef = useRef(0);
+  const livesRef = useRef(TOTAL_LIVES);
+  const imbalanceStartRef = useRef(null);
+  const waveParamsRef = useRef(getWaveParams(downlink));
+  const boardConnectedRef = useRef(false);
+  const lastActionRef = useRef(null);
+  const targetPoseActiveRef = useRef(false);
+  const currentPoseRef = useRef(currentPose);
 
   // waveParams を ref に同期 (ゲームループ内で参照)
   useEffect(() => {
@@ -251,8 +301,8 @@ export default function GameScene({ playerName, onGameOver, wiiBoard }) {
 
   // currentPose を ref に同期
   useEffect(() => {
-    currentPoseRef.current = currentPose
-  }, [currentPose])
+    currentPoseRef.current = currentPose;
+  }, [currentPose]);
 
   // ── メインゲームループ ──
   useEffect(() => {
@@ -267,69 +317,93 @@ export default function GameScene({ playerName, onGameOver, wiiBoard }) {
 
       // ── ポーズ判定 (MediaPipe Landmarks) ──
 
-      const activePose = currentPoseRef.current
-      let detectedAction = null
-      if (currentPoseData && currentPoseData.landmarks && currentPoseData.landmarks.length > 0) {
-        const lm = currentPoseData.landmarks[0]
+      const activePose = currentPoseRef.current;
+      let detectedAction = null;
+      if (
+        currentPoseData &&
+        currentPoseData.landmarks &&
+        currentPoseData.landmarks.length > 0
+      ) {
+        const lm = currentPoseData.landmarks[0];
 
         // 現在の目標ポーズを判定
-        const isTargetPose = checkPose(activePose.id, lm)
+        const isTargetPose = checkPose(activePose.id, lm);
         if (isTargetPose !== targetPoseActiveRef.current) {
-          targetPoseActiveRef.current = isTargetPose
-          setTargetPoseActive(isTargetPose)
+          targetPoseActiveRef.current = isTargetPose;
+          setTargetPoseActive(isTargetPose);
         }
 
         if (isTargetPose) {
-          detectedAction = activePose
+          detectedAction = activePose;
         } else if (lm[25] && lm[26]) {
-          const kneeY = Math.min(lm[25].y, lm[26].y)
-          const maxKneeY = Math.max(lm[25].y, lm[26].y)
+          const kneeY = Math.min(lm[25].y, lm[26].y);
+          const maxKneeY = Math.max(lm[25].y, lm[26].y);
           if (maxKneeY > 0.75) {
-            detectedAction = { label: 'Squat', points: 500 }
+            detectedAction = { label: "Squat", points: 500 };
           } else if (kneeY < 0.5) {
-            detectedAction = { label: 'Jump', points: 500 }
+            detectedAction = { label: "Jump", points: 500 };
           }
         }
 
         if (!detectedAction && lm[11] && lm[12] && lm[15] && lm[16]) {
           if (lm[16].y < lm[12].y && lm[15].y > lm[11].y) {
-            detectedAction = { label: 'Right Up, Left Down', points: 500 }
+            detectedAction = { label: "Right Up, Left Down", points: 500 };
           }
         }
       } else if (targetPoseActiveRef.current) {
-        targetPoseActiveRef.current = false
-        setTargetPoseActive(false)
+        targetPoseActiveRef.current = false;
+        setTargetPoseActive(false);
       }
 
-      if (detectedAction && (!lastActionRef.current || lastActionRef.current.label !== detectedAction.label)) {
-        const newAction = { id: Date.now(), label: detectedAction.label, points: detectedAction.points }
-        lastActionRef.current = newAction
-        setLastAction(newAction)
+      if (
+        detectedAction &&
+        (!lastActionRef.current ||
+          lastActionRef.current.label !== detectedAction.label)
+      ) {
+        const newAction = {
+          id: Date.now(),
+          label: detectedAction.label,
+          points: detectedAction.points,
+        };
+        lastActionRef.current = newAction;
+        setLastAction(newAction);
 
-        scoreRef.current += detectedAction.points
-        setScore(Math.floor(scoreRef.current))
+        scoreRef.current += detectedAction.points;
+        setScore(Math.floor(scoreRef.current));
 
         // ── ポーズ成功時: 次のランダムポーズに切り替え ──
-        if (POSE_LIST.some(p => p.id === detectedAction.id)) {
-          const next = pickRandomPose(detectedAction.id)
-          currentPoseRef.current = next
-          setCurrentPose(next)
+        if (POSE_LIST.some((p) => p.id === detectedAction.id)) {
+          const next = pickRandomPose(detectedAction.id);
+          currentPoseRef.current = next;
+          setCurrentPose(next);
           // ポーズ成功フラグをリセット
-          targetPoseActiveRef.current = false
-          setTargetPoseActive(false)
+          targetPoseActiveRef.current = false;
+          setTargetPoseActive(false);
         }
       } else if (!detectedAction && lastActionRef.current) {
-        lastActionRef.current = null
+        lastActionRef.current = null;
       }
 
       // ── バランス判定 ──
-      const targetX = calcWaveTilt(wpf.amplitude, wpf.frequency, wpf.speed, wpf.turbulence, elapsedTime)
-      const copX    = boardConnectedRef.current ? copRef.current.x : 0
-      const calibratedX = boardConnectedRef.current ? copRef.current.x : 0
-      const diff    = Math.abs(targetX - copX)
-      const ok      = diff < BALANCE_TOLERANCE
+      const targetX = calcWaveTilt(
+        wpf.amplitude,
+        wpf.frequency,
+        wpf.speed,
+        wpf.turbulence,
+        elapsedTime,
+      );
+      const copX = boardConnectedRef.current ? copRef.current.x : 0;
+      const calibratedX = boardConnectedRef.current ? copRef.current.x : 0;
+      const diff = Math.abs(targetX - copX);
+      const ok = diff < BALANCE_TOLERANCE;
 
-      setBalance({ copX, calibratedX, targetX, ok, boardConnected: boardConnectedRef.current })
+      setBalance({
+        copX,
+        calibratedX,
+        targetX,
+        ok,
+        boardConnected: boardConnectedRef.current,
+      });
 
       if (!ok) {
         if (!imbalanceStartRef.current) {
