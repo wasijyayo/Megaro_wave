@@ -1,190 +1,248 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
-import R3FGameCanvas  from './R3FGameCanvas.jsx'
-import HUD            from './HUD.jsx'
-import { useWifiStats }  from '../../hooks/useWifiStats.js'
-import { useWiiBoard }   from '../../hooks/useWiiBoard.js'
-import { usePersonPoseAndSegmentation } from '../../hooks/usePersonPoseAndSegmentation.ts'
-import { usePersonSegmentation } from '../../hooks/usePersonSegmentation.ts'
-import { getWaveParams, calcWaveTilt } from '../../utils/waveParams.js'
+import { useState, useRef, useEffect, useCallback } from "react";
+import R3FGameCanvas from "./R3FGameCanvas.jsx";
+import HUD from "./HUD.jsx";
+import { useWifiStats } from "../../hooks/useWifiStats.js";
+import { useWiiBoard } from "../../hooks/useWiiBoard.js";
+import { usePersonPoseAndSegmentation } from "../../hooks/usePersonPoseAndSegmentation.ts";
+import { usePersonSegmentation } from "../../hooks/usePersonSegmentation.ts";
+import { getWaveParams, calcWaveTilt } from "../../utils/waveParams.js";
 
 // ── 定数 ──────────────────────────────────────────────────
-const TOTAL_LIVES        = 3
-const BALANCE_TOLERANCE  = 0.28   // CoP と目標傾きの許容差 (-1〜1)
-const IMBALANCE_TIMEOUT  = 2000   // ms: この時間超えるとライフ -1
+const TOTAL_LIVES = 1;
+const BALANCE_TOLERANCE = 0.01; // CoP と目標傾きの許容差 (-1〜1)
+const IMBALANCE_TIMEOUT = 1; // ms: この時間超えるとライフ -1
 
 // ─────────────────────────────────────────────────────────
 export default function GameScene({ playerName, onGameOver }) {
-  const elapsedTimeRef = useRef(0)
+  const elapsedTimeRef = useRef(0);
 
   // ── hooks ──
-  const { downlink }                          = useWifiStats()
-  const { connected: boardConnected, copRef, connect: connectBoard } = useWiiBoard()
-  
+  const { downlink } = useWifiStats();
+  const {
+    connected: boardConnected,
+    copRef,
+    connect: connectBoard,
+  } = useWiiBoard();
+
   // ポーズ検知フック（骨格描画のみ）
-  const { canvas: poseCanvas, status: poseStatus, poseData } = usePersonPoseAndSegmentation()
+  const {
+    canvas: poseCanvas,
+    status: poseStatus,
+    poseData,
+  } = usePersonPoseAndSegmentation();
   // セグメンテーション（人物マスク・描画）フック
-  const { canvas: segCanvas, status: segStatus } = usePersonSegmentation()
+  const { canvas: segCanvas, status: segStatus } = usePersonSegmentation();
   // セグメント + ポーズを重ねる合成キャンバス
   const [combinedCanvas] = useState(() => {
-    const c = document.createElement('canvas')
-    c.width = 720
-    c.height = 1280
-    return c
-  })
+    const c = document.createElement("canvas");
+    c.width = 720;
+    c.height = 1280;
+    return c;
+  });
 
   // segCanvas と poseCanvas を合成して combinedCanvas に書き込む
   useEffect(() => {
-    let raf = 0
+    let raf = 0;
     function loop() {
       if (!segCanvas || !poseCanvas) {
-        raf = requestAnimationFrame(loop)
-        return
+        raf = requestAnimationFrame(loop);
+        return;
       }
 
-      if (combinedCanvas.width !== segCanvas.width || combinedCanvas.height !== segCanvas.height) {
-        combinedCanvas.width = segCanvas.width
-        combinedCanvas.height = segCanvas.height
+      if (
+        combinedCanvas.width !== segCanvas.width ||
+        combinedCanvas.height !== segCanvas.height
+      ) {
+        combinedCanvas.width = segCanvas.width;
+        combinedCanvas.height = segCanvas.height;
       }
 
-      const ctx = combinedCanvas.getContext('2d')
-      if (!ctx) { raf = requestAnimationFrame(loop); return }
-      ctx.clearRect(0, 0, combinedCanvas.width, combinedCanvas.height)
+      const ctx = combinedCanvas.getContext("2d");
+      if (!ctx) {
+        raf = requestAnimationFrame(loop);
+        return;
+      }
+      ctx.clearRect(0, 0, combinedCanvas.width, combinedCanvas.height);
       // セグメント映像を下地に描画
-      ctx.drawImage(segCanvas, 0, 0, combinedCanvas.width, combinedCanvas.height)
+      ctx.drawImage(
+        segCanvas,
+        0,
+        0,
+        combinedCanvas.width,
+        combinedCanvas.height,
+      );
       // ポーズ（骨格）は上に重ねる
-      ctx.drawImage(poseCanvas, 0, 0, combinedCanvas.width, combinedCanvas.height)
+      ctx.drawImage(
+        poseCanvas,
+        0,
+        0,
+        combinedCanvas.width,
+        combinedCanvas.height,
+      );
 
-      raf = requestAnimationFrame(loop)
+      raf = requestAnimationFrame(loop);
     }
-    loop()
-    return () => cancelAnimationFrame(raf)
-  }, [segCanvas, poseCanvas, combinedCanvas])
+    loop();
+    return () => cancelAnimationFrame(raf);
+  }, [segCanvas, poseCanvas, combinedCanvas]);
 
   // ── UI state ──
-  const [score,      setScore]      = useState(0)
-  const [lives,      setLives]      = useState(TOTAL_LIVES)
-  const [balance,    setBalance]    = useState({ copX: 0, targetX: 0, ok: true, boardConnected: false })
-  const [lastAction, setLastAction] = useState(null)
+  const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(TOTAL_LIVES);
+  const [balance, setBalance] = useState({
+    copX: 0,
+    targetX: 0,
+    ok: true,
+    boardConnected: false,
+  });
+  const [lastAction, setLastAction] = useState(null);
 
   // ── ゲームロジック用 refs (state 更新による effect 再起動を避ける) ──
-  const scoreRef             = useRef(0)
-  const livesRef             = useRef(TOTAL_LIVES)
-  const imbalanceStartRef    = useRef(null)
-  const waveParamsRef        = useRef(getWaveParams(downlink))
-  const boardConnectedRef    = useRef(false)
-  const lastActionRef        = useRef(null)
+  const scoreRef = useRef(0);
+  const livesRef = useRef(TOTAL_LIVES);
+  const imbalanceStartRef = useRef(null);
+  const waveParamsRef = useRef(getWaveParams(downlink));
+  const boardConnectedRef = useRef(false);
+  const lastActionRef = useRef(null);
 
   // waveParams を ref に同期 (ゲームループ内で参照)
   useEffect(() => {
-    waveParamsRef.current = getWaveParams(downlink)
-  }, [downlink])
+    waveParamsRef.current = getWaveParams(downlink);
+  }, [downlink]);
 
   useEffect(() => {
-    boardConnectedRef.current = boardConnected
-  }, [boardConnected])
+    boardConnectedRef.current = boardConnected;
+  }, [boardConnected]);
 
-  const poseDataRef = useRef(null)
+  const poseDataRef = useRef(null);
   useEffect(() => {
-    poseDataRef.current = poseData
-  }, [poseData])
+    poseDataRef.current = poseData;
+  }, [poseData]);
 
   // ── メインゲームループ ──
   useEffect(() => {
-    let rafId
+    let rafId;
 
     const loop = (timestamp) => {
-      rafId = requestAnimationFrame(loop)
+      rafId = requestAnimationFrame(loop);
 
-      const wpf          = waveParamsRef.current
-      const elapsedTime = elapsedTimeRef.current
-      const currentPoseData = poseDataRef.current
+      const wpf = waveParamsRef.current;
+      const elapsedTime = elapsedTimeRef.current;
+      const currentPoseData = poseDataRef.current;
 
       // ── ポーズ判定 (MediaPipe Landmarks) ──
       // しゃがみ(Squat): 膝(左右どちらか)が > 0.75
       // ジャンプ(Jump): 膝(左右どちらか)が < 0.5
       // 両手: 右腕(RIGHT_WRIST) < 右肩(RIGHT_SHOULDER) かつ 左腕(LEFT_WRIST) > 左肩(LEFT_SHOULDER)
-      let actionLabel = null
-      if (currentPoseData && currentPoseData.landmarks && currentPoseData.landmarks.length > 0) {
-        const lm = currentPoseData.landmarks[0]
-        
+      let actionLabel = null;
+      if (
+        currentPoseData &&
+        currentPoseData.landmarks &&
+        currentPoseData.landmarks.length > 0
+      ) {
+        const lm = currentPoseData.landmarks[0];
+
         // MediaPipe Pose landmarks indices
         // 11: left shoulder, 12: right shoulder
         // 15: left wrist, 16: right wrist
         // 25: left knee, 26: right knee
-        
+
         if (lm[25] && lm[26]) {
-          const kneeY = Math.min(lm[25].y, lm[26].y) // より上にある(値が小さい)方の膝を基準にする
-          const maxKneeY = Math.max(lm[25].y, lm[26].y) // より下にある(値が大きい)方の膝
-          
+          const kneeY = Math.min(lm[25].y, lm[26].y); // より上にある(値が小さい)方の膝を基準にする
+          const maxKneeY = Math.max(lm[25].y, lm[26].y); // より下にある(値が大きい)方の膝
+
           if (maxKneeY > 0.75) {
-            actionLabel = "Squat"
+            actionLabel = "Squat";
           } else if (kneeY < 0.5) {
-            actionLabel = "Jump"
+            actionLabel = "Jump";
           }
         }
-        
+
         if (!actionLabel && lm[11] && lm[12] && lm[15] && lm[16]) {
           // 右手上げ: 右手首(16)のY < 右肩(12)のY   左手下げ: 左手首(15)のY > 左肩(11)のY
           if (lm[16].y < lm[12].y && lm[15].y > lm[11].y) {
-            actionLabel = "Right Up, Left Down"
+            actionLabel = "Right Up, Left Down";
           }
         }
       }
 
-      if (actionLabel && (!lastActionRef.current || lastActionRef.current.label !== actionLabel)) {
-        const newAction = { id: Date.now(), label: actionLabel, points: 500 }
-        lastActionRef.current = newAction
-        setLastAction(newAction)
-        
+      if (
+        actionLabel &&
+        (!lastActionRef.current || lastActionRef.current.label !== actionLabel)
+      ) {
+        const newAction = { id: Date.now(), label: actionLabel, points: 500 };
+        lastActionRef.current = newAction;
+        setLastAction(newAction);
+
         // アクションによるボーナス加算
-        scoreRef.current += 500
-        setScore(Math.floor(scoreRef.current))
+        scoreRef.current += 500;
+        setScore(Math.floor(scoreRef.current));
       } else if (!actionLabel && lastActionRef.current) {
-        lastActionRef.current = null
+        lastActionRef.current = null;
         // 意図的に setLastAction(null) を呼ばないことでHUDのPopupを残すか、
         // あるいは消すなら null をセット (表示時間が短くなるかも)
         // ここでは一旦そのまま (HUD側のフェードアウト任せ or 次のアクションまで残す)
       }
 
       // ── バランス判定 ──
-      const targetX = calcWaveTilt(wpf.amplitude, wpf.frequency, wpf.speed, wpf.turbulence, elapsedTime)
-      const copX    = boardConnectedRef.current ? copRef.current.x : 0
-      const diff    = Math.abs(targetX - copX)
-      const ok      = diff < BALANCE_TOLERANCE
+      const targetX = calcWaveTilt(
+        wpf.amplitude,
+        wpf.frequency,
+        wpf.speed,
+        wpf.turbulence,
+        elapsedTime,
+      );
+      const copX = boardConnectedRef.current ? copRef.current.x : 0;
+      const diff = Math.abs(targetX - copX);
+      const ok = diff < BALANCE_TOLERANCE;
 
-      setBalance({ copX, targetX, ok, boardConnected: boardConnectedRef.current })
+      setBalance({
+        copX,
+        targetX,
+        ok,
+        boardConnected: boardConnectedRef.current,
+      });
 
       if (!ok) {
         if (!imbalanceStartRef.current) {
-          imbalanceStartRef.current = timestamp
+          imbalanceStartRef.current = timestamp;
         } else if (timestamp - imbalanceStartRef.current > IMBALANCE_TIMEOUT) {
-          imbalanceStartRef.current = null
-          livesRef.current -= 1
-          setLives(livesRef.current)
+          imbalanceStartRef.current = null;
+          livesRef.current -= 1;
+          setLives(livesRef.current);
           if (livesRef.current <= 0) {
-            onGameOver(Math.floor(scoreRef.current))
-            return
+            onGameOver(Math.floor(scoreRef.current));
+            return;
           }
         }
       } else {
-        imbalanceStartRef.current = null
+        imbalanceStartRef.current = null;
         // バランス維持ボーナス (微量)
-        scoreRef.current += wpf.difficultyMultiplier * 0.05
-        setScore(Math.floor(scoreRef.current))
+        scoreRef.current += wpf.difficultyMultiplier * 0.05;
+        setScore(Math.floor(scoreRef.current));
       }
+    };
 
-    }
-
-    rafId = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(rafId)
-  }, [copRef, onGameOver])
+    rafId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafId);
+  }, [copRef, onGameOver]);
 
   return (
-    <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', background: '#000' }}>
+    <div
+      style={{
+        position: "relative",
+        width: "100vw",
+        height: "100vh",
+        overflow: "hidden",
+        background: "#000",
+      }}
+    >
       <R3FGameCanvas
         waveParams={getWaveParams(downlink)}
         personCanvas={combinedCanvas}
-        onElapsedTime={(t) => { elapsedTimeRef.current = t }}
+        onElapsedTime={(t) => {
+          elapsedTimeRef.current = t;
+        }}
       />
 
       {/* レイヤー: HUD */}
@@ -197,7 +255,9 @@ export default function GameScene({ playerName, onGameOver }) {
         lastAction={lastAction}
       />
 
-      <div style={s.maskStatus}>{segStatus} / {poseStatus}</div>
+      <div style={s.maskStatus}>
+        {segStatus} / {poseStatus}
+      </div>
 
       {/* Wii Board 接続ボタン */}
       {!boardConnected && (
@@ -206,21 +266,35 @@ export default function GameScene({ playerName, onGameOver }) {
         </button>
       )}
     </div>
-  )
+  );
 }
 
 const s = {
   maskStatus: {
-    position: 'absolute', top: 12, left: 12,
-    background: 'rgba(0,0,0,0.55)', color: '#fff',
-    padding: '8px 12px', borderRadius: 6, fontSize: 13, fontFamily: 'monospace',
-    pointerEvents: 'none', lineHeight: 1.5,
+    position: "absolute",
+    top: 12,
+    left: 12,
+    background: "rgba(0,0,0,0.55)",
+    color: "#fff",
+    padding: "8px 12px",
+    borderRadius: 6,
+    fontSize: 13,
+    fontFamily: "monospace",
+    pointerEvents: "none",
+    lineHeight: 1.5,
     zIndex: 20,
   },
   boardBtn: {
-    position: 'absolute', bottom: 20, right: 20,
-    padding: '8px 18px', background: '#1a4fc4', color: '#fff',
-    border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13,
+    position: "absolute",
+    bottom: 20,
+    right: 20,
+    padding: "8px 18px",
+    background: "#1a4fc4",
+    color: "#fff",
+    border: "none",
+    borderRadius: 6,
+    cursor: "pointer",
+    fontSize: 13,
     zIndex: 20,
   },
-}
+};
