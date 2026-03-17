@@ -189,7 +189,7 @@ function checkPose(poseId, lm) {
 }
 
 // ─────────────────────────────────────────────────────────
-export default function GameScene({ playerName, onGameOver, wiiBoard }) {
+export default function GameScene({ playerName, onGameOver, wiiBoard, waveParamsOverride, onScoreChange }) {
   const elapsedTimeRef = useRef(0);
 
   // ── hooks ──
@@ -287,10 +287,14 @@ export default function GameScene({ playerName, onGameOver, wiiBoard }) {
   const targetPoseActiveRef = useRef(false);
   const currentPoseRef = useRef(currentPose);
 
-  // waveParams を ref に同期 (ゲームループ内で参照)
+  // waveParams を ref に同期（対戦時は override を優先）
   useEffect(() => {
-    waveParamsRef.current = getWaveParams(downlink);
-  }, [downlink]);
+    waveParamsRef.current = waveParamsOverride ?? getWaveParams(downlink);
+  }, [downlink, waveParamsOverride]);
+
+  // onScoreChange コールバックを ref で保持（再レンダー不要）
+  const onScoreChangeRef = useRef(onScoreChange);
+  useEffect(() => { onScoreChangeRef.current = onScoreChange }, [onScoreChange]);
 
   useEffect(() => {
     boardConnectedRef.current = boardConnected;
@@ -372,6 +376,7 @@ export default function GameScene({ playerName, onGameOver, wiiBoard }) {
 
         scoreRef.current += detectedAction.points;
         setScore(Math.floor(scoreRef.current));
+        onScoreChangeRef.current?.(Math.floor(scoreRef.current));
 
         // ── ポーズ成功時: 次のランダムポーズに切り替え ──
         if (POSE_LIST.some((p) => p.id === detectedAction.id)) {

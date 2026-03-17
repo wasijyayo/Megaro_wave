@@ -1,23 +1,22 @@
 import { useState, useEffect } from 'react'
 import { onAuth } from './firebase.js'
 import { UserContext } from './contexts/UserContext.js'
-import AuthScreen from './components/AuthScreen.jsx'
-import HomeScreen from './components/HomeScreen.jsx'
-import GameScene  from './components/game/GameScene.jsx'
-import GameOver   from './components/game/GameOver.jsx'
+import AuthScreen    from './components/AuthScreen.jsx'
+import HomeScreen    from './components/HomeScreen.jsx'
+import GameScene     from './components/game/GameScene.jsx'
+import GameOver      from './components/game/GameOver.jsx'
+import BattleSession from './components/battle/BattleSession.jsx'
 import { useWiiBoard } from './hooks/useWiiBoard.js'
 
 export default function App() {
-  const [user,       setUser]       = useState(undefined) // undefined=loading, null=未ログイン, object=ログイン済み
+  const [user,       setUser]       = useState(undefined)
   const [screen,     setScreen]     = useState('home')
   const [playerName, setPlayerName] = useState('Player')
   const [finalScore, setFinalScore] = useState(0)
 
-  // Wii Board の状態をアプリ全体で共有
   const wiiBoard = useWiiBoard()
 
   useEffect(() => {
-    // 5秒以内に応答がなければ未ログイン扱いにしてフリーズを防ぐ
     const timer = setTimeout(() => setUser(prev => prev === undefined ? null : prev), 5000)
     const unsubscribe = onAuth(firebaseUser => {
       clearTimeout(timer)
@@ -56,9 +55,10 @@ export default function App() {
 
   return (
     <UserContext.Provider value={user}>
-      {screen === 'home'     && <HomeScreen onStart={handleStart} wiiBoard={wiiBoard} />}
+      {screen === 'home'     && <HomeScreen onStart={handleStart} wiiBoard={wiiBoard} onBattle={() => setScreen('battle')} />}
       {screen === 'game'     && <GameScene  playerName={playerName} onGameOver={handleGameOver} wiiBoard={wiiBoard} />}
       {screen === 'gameover' && <GameOver   score={finalScore} playerName={playerName} onRestart={handleRestart} />}
+      {screen === 'battle'   && <BattleSession wiiBoard={wiiBoard} onExit={() => setScreen('home')} />}
     </UserContext.Provider>
   )
 }
