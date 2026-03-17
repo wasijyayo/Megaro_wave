@@ -1,61 +1,120 @@
-import { useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
-import { Stars, Float, MeshDistortMaterial } from '@react-three/drei'
-import * as THREE from 'three'
+import React, { useRef, useMemo } from 'react';
+import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
+import PersonPlane from './PersonPlane'
+import { getWaveHeight } from '../../utils/waveParams'
 
-interface OrbProps {
-  position: [number, number, number]
-  color: string
-  speed?: number
-  scale?: number
-}
-
-function Orb({ position, color, speed = 1, scale = 1 }: OrbProps) {
-  return (
-    <Float speed={speed} rotationIntensity={0.4} floatIntensity={1.5}>
-      <mesh position={position} scale={scale}>
-        <sphereGeometry args={[1, 32, 32]} />
-        <MeshDistortMaterial
-          color={color}
-          distort={0.35}
-          speed={2}
-          roughness={0.1}
-          metalness={0.6}
-          transparent
-          opacity={0.85}
-        />
-      </mesh>
-    </Float>
-  )
-}
-
-export default function BackgroundScene() {
-  const groupRef = useRef<THREE.Group>(null)
+// 波のメッシュ
+const Ocean = ({ amplitude = 0.5, frequency = 1.0, speed = 1.0 }) => {
+  const meshRef = useRef<THREE.Mesh>(null);
+  
+  // ジオメトリを準備
+  const geometry = useMemo(() => new THREE.PlaneGeometry(10, 10, 32, 32), []);
+  
+  // 初期位置を保存しておく
+  const initialPositions = useMemo(() => {
+    const positions = geometry.attributes.position;
+    const array = new Float32Array(positions.array.length);
+    for (let i = 0; i < positions.array.length; i++) {
+      array[i] = positions.array[i];
+    }
+    return array;
+  }, [geometry]);
 
   useFrame((state) => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y = state.clock.elapsedTime * 0.05
+    const time = state.clock.getElapsedTime();
+    const positions = geometry.attributes.position;
+    
+    for (let i = 0; i < positions.count; i++) {
+      const x = initialPositions[i * 3];
+      const z = initialPositions[i * 3 + 1]; // PlaneGeometryは初期X-Y平面なので、2番目が実質Z軸方向
+      
+      const y = getWaveHeight(x, z, time, amplitude, frequency, speed);
+      positions.setZ(i, y); // 回転させる前なのでZを更新
     }
-  })
+    positions.needsUpdate = true;
+    geometry.computeVertexNormals(); // これをやらないと光が変になる
+  });
+
+  return (
+    <mesh ref={meshRef} geometry={geometry} rotation={[-Math.PI / 2, 0, 0]}>
+      <meshStandardMaterial color="#0055ff" wireframe={false} roughness={0.1} metalness={0.5} />
+    </mesh>
+  );
+};
+
+// 指定座標の高さを動的に取得して追従する浮き(テスト用)
+type TrackerProps = {
+  targetX: number;
+  amplitude?: number;
+  frequency?: number;
+  speed?: number;
+};
+
+const Tracker = ({ targetX, amplitude = 0.5, frequency = 1.0, speed = 1.0 }: TrackerProps) => {
+  const sphereRef = useRef<THREE.Mesh | null>(null);
+  const radius = 0.22; // 球の半径と同程度のオフセットを適用して埋まりを防止
+
+  useFrame((state) => {
+    const time = state.clock.getElapsedTime();
+    // ここで動的に指定座標(targetX, targetZ)の波の高さを取得
+    // (targetZ を廃止したため Z=0を使う)
+    const currentY = getWaveHeight(targetX, 0, time, amplitude, frequency, speed);
+    
+    if (sphereRef.current) {
+      // 波面に完全に埋まらないように、球の半径分だけ少し浮かせる
+      sphereRef.current.position.set(targetX, currentY + radius, 0);
+    }
+  });
+
+  return (
+    <mesh ref={sphereRef}>
+      <sphereGeometry args={[radius, 16, 16]} />
+      <meshStandardMaterial color="red" />
+    </mesh>
+  );
+};
+
+export default function BackgroundScene({
+  waveParams,
+  personCanvas,
+  personTransform,
+}: {
+  waveParams?: { amplitude?: number; frequency?: number; speed?: number };
+  personCanvas?: HTMLCanvasElement;
+  personTransform?: { position?: [number, number, number]; rotation?: [number, number, number]; scale?: [number, number, number] };
+}) {
+  const params = waveParams || {
+    // デフォルトの波のパラメータ
+    amplitude: 0.8,// 波の高さ
+    frequency: 1.5,// 波の密度(大きいほど細かい波になる)
+    speed: 1.0,// 波の速さ
+  };
 
   return (
     <>
-      <color attach="background" args={['#050510']} />
-      <ambientLight intensity={0.4} />
-      <pointLight position={[10, 10, 10]} color="#4080ff" intensity={30} />
-      <pointLight position={[-10, -5, 5]} color="#ff4080" intensity={20} />
-      <pointLight position={[0, -10, 0]} color="#80ff40" intensity={15} />
+      <ambientLight intensity={0.5} />
+      <directionalLight position={[0, 10, 5]} intensity={1} />
 
-      <Stars radius={80} depth={60} count={5000} factor={3} saturation={0.5} fade speed={0.3} />
+      {/* 海面 */}
+      <Ocean {...params} />
 
-      <group ref={groupRef}>
-        <Orb position={[-5, 2, -12]} color="#3366ff" speed={0.7} scale={1.2} />
-        <Orb position={[5, -1.5, -8]} color="#ff3366" speed={1.1} scale={0.9} />
-        <Orb position={[2, 4, -15]} color="#33ffcc" speed={0.5} scale={1.5} />
-        <Orb position={[-3, -3, -6]} color="#ffcc33" speed={1.4} scale={0.7} />
-        <Orb position={[7, 3, -10]} color="#cc33ff" speed={0.9} scale={1.0} />
-        <Orb position={[-7, -1, -14]} color="#ff9933" speed={0.6} scale={1.1} />
-      </group>
+      {personCanvas && (
+        <PersonPlane
+          canvas={personCanvas}
+          mode="translate"
+          enableControls={false}
+          position={personTransform?.position ?? [0, -0.35, 0.25]}
+          rotation={personTransform?.rotation ?? [0, 0, 0]}
+          scale={personTransform?.scale ?? [1.15, 1.15, 1.15]}
+          followWave={true}
+          waveParams={params}
+          heightOffset={2}
+        />
+      )}
+
+      {/* 追加のサンプルトラッカー（残すか削除するかは任意） */}
+      <Tracker targetX={2} {...params} />
     </>
-  )
+  );
 }

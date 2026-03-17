@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { TransformControls } from '@react-three/drei'
 import * as THREE from 'three'
+import { getWaveHeight } from '../../utils/waveParams'
 
 const ASPECT = 16 / 9
 const PLANE_HEIGHT = 3.2 // units in scene
@@ -15,6 +16,10 @@ interface PersonPlaneProps {
   position?: [number, number, number]
   rotation?: [number, number, number]
   scale?: [number, number, number]
+  // 波に追従させるオプション
+  followWave?: boolean
+  waveParams?: { amplitude?: number; frequency?: number; speed?: number }
+  heightOffset?: number
 }
 
 export default function PersonPlane({
@@ -24,6 +29,9 @@ export default function PersonPlane({
   position = [0, 0, 0.1],
   rotation = [0, 0, 0],
   scale = [1, 1, 1],
+  followWave = false,
+  waveParams = { amplitude: 0.5, frequency: 1.0, speed: 1.0 },
+  heightOffset = 0,
 }: PersonPlaneProps) {
   const meshRef = useRef<THREE.Mesh>(null)
 
@@ -37,8 +45,18 @@ export default function PersonPlane({
   }, [canvas])
 
   // 毎フレーム canvas の内容を GPU に転送
-  useFrame(() => {
+  useFrame((state) => {
     texture.needsUpdate = true
+
+    if (followWave && meshRef.current) {
+      const time = state.clock.getElapsedTime()
+      const pos = meshRef.current.position
+      const x = pos.x
+      const z = pos.z
+      const { amplitude = 0.5, frequency = 1.0, speed = 1.0 } = waveParams || {}
+      const y = getWaveHeight(x, z, time, amplitude, frequency, speed)
+      meshRef.current.position.y = y + heightOffset
+    }
   })
 
   const plane = (
