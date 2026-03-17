@@ -5,9 +5,9 @@ import BackgroundScene from '../r3f/BackgroundScene.tsx'
 import PersonPlane from '../r3f/PersonPlane.tsx'
 
 const PERSON_TRANSFORM = {
-  position: [0, -0.35, 0.25],
-  rotation: [0, 0, 0],
-  scale: [1.15, 1.15, 1.15],
+  position: [0, -0.6, 0.25],
+  rotation: [-Math.atan2(2.8 - (-0.35), 7 - 0.25), 0, 0], // カメラの角度(見下ろし)に合わせて傾ける
+  scale: [3.4, 3.4, 3.4],
 }
 
 const CAMERA_TARGET = [0, -0.35, 0.25]
@@ -116,31 +116,19 @@ function CameraLookAt({ target }) {
   return null
 }
 
-function CameraController({ lastAction }) {
+function CameraController() {
   const { camera } = useThree()
-  const targetY = useRef(2.8)
 
-  useFrame((state, delta) => {
-    const actionStr = lastAction?.label || lastAction
-    
-    // ポーズに応じて目標の高さを設定
-    if (actionStr === 'Jump') {
-      targetY.current = 4.5
-    } else if (actionStr === 'Squat') {
-      targetY.current = 1.2
-    } else {
-      targetY.current = 2.8
-    }
-
-    // カメラを滑らかに移動させる
-    camera.position.y = THREE.MathUtils.lerp(camera.position.y, targetY.current, 5.0 * delta)
+  useEffect(() => {
+    camera.position.set(0, 2.8, 7)
     camera.lookAt(CAMERA_TARGET[0], CAMERA_TARGET[1], CAMERA_TARGET[2])
-  })
+    camera.updateProjectionMatrix()
+  }, [camera])
 
   return null
 }
 
-export default function R3FGameCanvas({ waveParams, personCanvas, onElapsedTime, lastAction }) {
+export default function R3FGameCanvas({ waveParams, personCanvas, onElapsedTime }) {
   return (
     <Canvas
       style={{ position: 'absolute', inset: 0 }}
@@ -148,7 +136,7 @@ export default function R3FGameCanvas({ waveParams, personCanvas, onElapsedTime,
       gl={{ antialias: true, alpha: false }}
       dpr={[1, 2]}
     >
-      <CameraController lastAction={lastAction} />
+      <CameraController />
       <color attach="background" args={['#071428']} />
       <BackgroundScene />
       <WaveSurface waveParams={waveParams} onElapsedTime={onElapsedTime} />

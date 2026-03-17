@@ -4,6 +4,7 @@ import HUD            from './HUD.jsx'
 import { useWifiStats }  from '../../hooks/useWifiStats.js'
 import { useWiiBoard }   from '../../hooks/useWiiBoard.js'
 import { usePersonPoseAndSegmentation } from '../../hooks/usePersonPoseAndSegmentation.ts'
+import { usePersonSegmentation } from '../../hooks/usePersonSegmentation.ts'
 import { getWaveParams, calcWaveTilt } from '../../utils/waveParams.js'
 
 // ── 定数 ──────────────────────────────────────────────────
@@ -18,7 +19,9 @@ export default function GameScene({ playerName, onGameOver }) {
   // ── hooks ──
   const { downlink }                          = useWifiStats()
   const { connected: boardConnected, copRef, connect: connectBoard } = useWiiBoard()
-  const { canvas: personCanvas, status: personMaskStatus, poseData } = usePersonPoseAndSegmentation()
+  
+  // ポーズ検知・セグメンテーション統合フック
+  const { canvas: personCanvas, status: poseStatus, poseData } = usePersonPoseAndSegmentation()
 
   // ── UI state ──
   const [score,      setScore]      = useState(0)
@@ -54,8 +57,8 @@ export default function GameScene({ playerName, onGameOver }) {
       const elapsedTime = elapsedTimeRef.current
 
       // ── ポーズ判定 (MediaPipe Landmarks) ──
-      // しゃがみ(Squat): 膝(左右どちらか)が > 0.8
-      // ジャンプ(Jump): 膝(左右どちらか)が < 0.4
+      // しゃがみ(Squat): 膝(左右どちらか)が > 0.75
+      // ジャンプ(Jump): 膝(左右どちらか)が < 0.5
       // 両手: 右腕(RIGHT_WRIST) < 右肩(RIGHT_SHOULDER) かつ 左腕(LEFT_WRIST) > 左肩(LEFT_SHOULDER)
       let actionLabel = null
       if (poseData && poseData.landmarks && poseData.landmarks.length > 0) {
@@ -70,9 +73,9 @@ export default function GameScene({ playerName, onGameOver }) {
           const kneeY = Math.min(lm[25].y, lm[26].y) // より上にある(値が小さい)方の膝を基準にする
           const maxKneeY = Math.max(lm[25].y, lm[26].y) // より下にある(値が大きい)方の膝
           
-          if (maxKneeY > 0.8) {
+          if (maxKneeY > 0.75) {
             actionLabel = "Squat"
-          } else if (kneeY < 0.4) {
+          } else if (kneeY < 0.5) {
             actionLabel = "Jump"
           }
         }
@@ -139,7 +142,6 @@ export default function GameScene({ playerName, onGameOver }) {
         waveParams={getWaveParams(downlink)}
         personCanvas={personCanvas}
         onElapsedTime={(t) => { elapsedTimeRef.current = t }}
-        lastAction={lastAction}
       />
 
       {/* レイヤー: HUD */}
@@ -152,7 +154,7 @@ export default function GameScene({ playerName, onGameOver }) {
         lastAction={lastAction}
       />
 
-      <div style={s.maskStatus}>{personMaskStatus}</div>
+      <div style={s.maskStatus}>{poseStatus}</div>
 
       {/* Wii Board 接続ボタン */}
       {!boardConnected && (
@@ -168,12 +170,14 @@ const s = {
   maskStatus: {
     position: 'absolute', top: 12, left: 12,
     background: 'rgba(0,0,0,0.55)', color: '#fff',
-    padding: '4px 10px', borderRadius: 6, fontSize: 13, fontFamily: 'monospace',
-    pointerEvents: 'none',
+    padding: '8px 12px', borderRadius: 6, fontSize: 13, fontFamily: 'monospace',
+    pointerEvents: 'none', lineHeight: 1.5,
+    zIndex: 20,
   },
   boardBtn: {
     position: 'absolute', bottom: 20, right: 20,
     padding: '8px 18px', background: '#1a4fc4', color: '#fff',
     border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13,
+    zIndex: 20,
   },
 }
