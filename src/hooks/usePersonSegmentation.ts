@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSharedCamera } from './useSharedCamera'
 import {
   FilesetResolver,
   ImageSegmenter,
@@ -19,18 +20,19 @@ export function usePersonSegmentation() {
   // useState initializer で canvas を初回レンダー時に生成（参照が安定する）
   const [canvas] = useState<HTMLCanvasElement>(() => {
     const c = document.createElement('canvas')
-    c.width = 1280
-    c.height = 720
+    c.width = 720
+    c.height = 1280
     return c
   })
 
   const [status, setStatus] = useState('初期化中...')
 
+  const { video: sharedVideo, status: camStatus } = useSharedCamera({ width: 720, height: 1280 })
+
   useEffect(() => {
     let cancelled = false
     let raf = 0
     let segmenter: ImageSegmenter | null = null
-    let stream: MediaStream | null = null
     const maskCanvas = document.createElement('canvas')
 
     async function init() {
@@ -48,19 +50,12 @@ export function usePersonSegmentation() {
         if (cancelled) { seg.close(); return }
         segmenter = seg
 
-        setStatus('カメラ起動中...')
-        const s = await navigator.mediaDevices.getUserMedia({
-          video: { width: 1280, height: 720 },
-        })
-        if (cancelled) { s.getTracks().forEach(t => t.stop()); return }
-        stream = s
+        if (!sharedVideo) {
+          setStatus(camStatus)
+          return
+        }
 
-        const video = document.createElement('video')
-        video.playsInline = true
-        video.muted = true
-        video.srcObject = stream
-        await video.play()
-
+        const video = sharedVideo
         setStatus('実行中')
 
         function loop() {
@@ -69,14 +64,29 @@ export function usePersonSegmentation() {
             raf = requestAnimationFrame(loop)
             return
           }
-          if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-            canvas.width = video.videoWidth
-            canvas.height = video.videoHeight
+          // 固定の縦長キャンバスに中央クロップして描画
+          const TARGET_W = canvas.width
+          const TARGET_H = canvas.height
+          if (canvas.width !== TARGET_W || canvas.height !== TARGET_H) {
+            canvas.width = TARGET_W
+            canvas.height = TARGET_H
           }
-
           const ctx = canvas.getContext('2d')!
           ctx.clearRect(0, 0, canvas.width, canvas.height)
-          ctx.drawImage(video, 0, 0)
+
+          const vRatio = video.videoWidth / video.videoHeight
+          const cRatio = canvas.width / canvas.height
+          let sx = 0, sy = 0, sW = video.videoWidth, sH = video.videoHeight
+          if (vRatio > cRatio) {
+            sH = video.videoHeight
+            sW = sH * cRatio
+            sx = (video.videoWidth - sW) / 2
+          } else {
+            sW = video.videoWidth
+            sH = sW / cRatio
+            sy = (video.videoHeight - sH) / 2
+          }
+          ctx.drawImage(video, sx, sy, sW, sH, 0, 0, canvas.width, canvas.height)
 
           segmenter!.segmentForVideo(video, performance.now(), (result: ImageSegmenterResult) => {
             const mask = result.categoryMask
@@ -119,9 +129,8 @@ export function usePersonSegmentation() {
       cancelled = true
       cancelAnimationFrame(raf)
       segmenter?.close()
-      stream?.getTracks().forEach(t => t.stop())
     }
-  }, [canvas])
+  }, [canvas, sharedVideo, camStatus])
 
   return { canvas, status }
 }

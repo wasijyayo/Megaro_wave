@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { useSharedCamera } from './useSharedCamera'
 import {
   FilesetResolver,
   PoseLandmarker,
@@ -22,11 +23,12 @@ export function usePersonPoseAndSegmentation() {
   // ポーズの landmarks を保持する state
   const [poseData, setPoseData] = useState<PoseLandmarkerResult | null>(null)
 
+  const { video: sharedVideo, status: camStatus } = useSharedCamera({ width: 720, height: 1280 })
+
   useEffect(() => {
     let cancelled = false
     let raf = 0
     let landmarker: PoseLandmarker | null = null
-    let stream: MediaStream | null = null
     const maskCanvas = document.createElement('canvas')
 
     async function init() {
@@ -39,24 +41,16 @@ export function usePersonPoseAndSegmentation() {
           baseOptions: { modelAssetPath: MODEL_URL, delegate: 'GPU' },
           runningMode: 'VIDEO',
           numPoses: 1,
-          outputSegmentationMasks: true, // セグメンテーションマスクを復活させる
         })
         if (cancelled) { lm.close(); return }
         landmarker = lm
 
-        setStatus('カメラ起動中...')
-        const s = await navigator.mediaDevices.getUserMedia({
-          video: { width: 1280, height: 720 },
-        })
-        if (cancelled) { s.getTracks().forEach(t => t.stop()); return }
-        stream = s
-
-        const video = document.createElement('video')
-        video.playsInline = true
-        video.muted = true
-        video.srcObject = stream
-        await video.play()
-
+        // カメラは共有フックを使う
+        if (!sharedVideo) {
+          setStatus(camStatus)
+          return
+        }
+        const video = sharedVideo
         setStatus('実行中')
 
         function loop() {
@@ -67,7 +61,7 @@ export function usePersonPoseAndSegmentation() {
           }
           
           try {
-            // 縦長のキャンバス (9:16) に固定し、左右を切り落とす
+            // 縦長のキャンバス (9:16) に固定（表示はしない。骨格オーバーレイ用）
             const TARGET_W = 720
             const TARGET_H = 1280
             if (canvas.width !== TARGET_W || canvas.height !== TARGET_H) {
@@ -76,66 +70,19 @@ export function usePersonPoseAndSegmentation() {
             }
 
             const ctx = canvas.getContext('2d')!
+            // 透明なオーバーレイとして骨格のみ描画するため背景はクリアのみ
             ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-            // カメラ映像の中央をクロップして描画
-            const vRatio = video.videoWidth / video.videoHeight
-            const cRatio = canvas.width / canvas.height
-            let sx=0, sy=0, sW=video.videoWidth, sH=video.videoHeight
-
-            if (vRatio > cRatio) {
-              // ビデオのほうが横長なので、左右の中央を切り出す
-              sH = video.videoHeight
-              sW = sH * cRatio
-              sx = (video.videoWidth - sW) / 2
-            } else {
-              // ビデオのほうが縦長なので、上下の中央を切り出す
-              sW = video.videoWidth
-              sH = sW / cRatio
-              sy = (video.videoHeight - sH) / 2
-            }
-
-            ctx.drawImage(video, sx, sy, sW, sH, 0, 0, canvas.width, canvas.height)
-
             const timestamp = performance.now()
-            // HTMLCanvasElement を直接渡して推論
-            const result = landmarker!.detectForVideo(canvas, timestamp)
-            
+            // カメラ映像はここでは描画せず、sharedVideo を直接渡して推論のみ行う
+            const result = landmarker!.detectForVideo(video, timestamp)
+
             // ポーズデータ(landmarks)の更新
             setPoseData(result)
 
-            // --- セグメンテーションマスクの処理 ---
-            const masks = result.segmentationMasks
-            if (masks && masks.length > 0) {
-              const mask = masks[0]
-              if (maskCanvas.width !== mask.width || maskCanvas.height !== mask.height) {
-                maskCanvas.width = mask.width
-                maskCanvas.height = mask.height
-              }
-              
-              const maskData = mask.getAsFloat32Array ? mask.getAsFloat32Array() : mask.getAsUint8Array()
-              const maskCtx = maskCanvas.getContext('2d')!
-              const imgData = maskCtx.createImageData(mask.width, mask.height)
+            // セグメンテーションは別フック(usePersonSegmentation)に任せるためここでは扱わない
 
-              // 閾値処理：ある程度確信度が高ければ人物(=255)として扱う
-              const isFloat = !!mask.getAsFloat32Array
-              const threshold = isFloat ? 0.3 : 127
-              for (let i = 0; i < maskData.length; i++) {
-                imgData.data[i * 4]     = 255
-                imgData.data[i * 4 + 1] = 255
-                imgData.data[i * 4 + 2] = 255
-                imgData.data[i * 4 + 3] = maskData[i] > threshold ? 255 : 0
-              }
-              maskCtx.putImageData(imgData, 0, 0)
-
-              ctx.globalCompositeOperation = 'destination-in'
-              ctx.drawImage(maskCanvas, 0, 0, canvas.width, canvas.height)
-              ctx.globalCompositeOperation = 'source-over'
-              
-              if (mask.close) { mask.close() }
-            }
-
-            // === デバッグ表示: 骨格と判定ラインの描画 ===
+            // === デバッグ表示: 骨格と判定ラインの描画（オーバーレイのみ） ===
             ctx.save()
 
             // ゲーム画面(R3FGameCanvas)で人物が反転表示される場合があるため、テキスト描画用に反転をリセット
@@ -172,7 +119,7 @@ export function usePersonPoseAndSegmentation() {
             drawText('SQUAT LINE (0.75)', 10, squatY - 10)
             ctx.setLineDash([]) // リセット
 
-            // 骨格(Landmarks)の描画
+            // 骨格(Landmarks)の描画（オーバーレイのみ）
             if (result.landmarks && result.landmarks.length > 0) {
               const lm = result.landmarks[0]
               
@@ -228,9 +175,8 @@ export function usePersonPoseAndSegmentation() {
       cancelled = true
       cancelAnimationFrame(raf)
       landmarker?.close()
-      stream?.getTracks().forEach(t => t.stop())
     }
-  }, [canvas])
+  }, [canvas, sharedVideo, camStatus])
 
   return { canvas, status, poseData }
 }
