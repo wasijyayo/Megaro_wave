@@ -1,15 +1,17 @@
+import { useEffect, useRef } from 'react'
+
 const TOTAL_LIVES = 3
 
 export default function HUD({
   score,
   lives,
-  balance,
+  balanceRef,
   waveLabel,
   difficultyMultiplier,
   lastAction,
   targetPose,
   targetPoseActive,
-  boardConnected
+  boardConnected,
 }) {
   return (
     <div style={s.root}>
@@ -72,7 +74,7 @@ export default function HUD({
       {/* 下中央: バランスメーター */}
       <div style={{ position: 'absolute', bottom: 28, left: '50%', transform: 'translateX(-50%)', width: 240, textAlign: 'center' }}>
         <div style={{ ...s.label, marginBottom: 6 }}>BALANCE</div>
-        <BalanceMeter balance={balance} />
+        <BalanceMeter balanceRef={balanceRef} />
         {!boardConnected && (
           <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
             Wii Board 未接続 (中央固定)
@@ -165,37 +167,43 @@ function TargetPosePreview({ poseId, active }) {
   }
 }
 
-function BalanceMeter({ balance }) {
-  const { copX, targetX, ok, calibratedX } = balance
-  const displayX = Number.isFinite(calibratedX) ? calibratedX : copX
-  const indicatorPct = Math.min(Math.max((displayX + 1) / 2, 0), 1) * 100
-  const targetPct    = Math.min(Math.max((targetX + 1) / 2, 0), 1) * 100
-  const color        = ok ? '#44ff88' : '#ff4444'
+function BalanceMeter({ balanceRef }) {
+  const trackRef     = useRef(null)
+  const zoneRef      = useRef(null)
+  const targetLineRef = useRef(null)
+  const indicatorRef = useRef(null)
+
+  useEffect(() => {
+    let rafId
+    function update() {
+      rafId = requestAnimationFrame(update)
+      const { copX, targetX, ok, calibratedX } = balanceRef.current
+      const displayX     = Number.isFinite(calibratedX) ? calibratedX : copX
+      const indicatorPct = Math.min(Math.max((displayX + 1) / 2, 0), 1) * 100
+      const targetPct    = Math.min(Math.max((targetX  + 1) / 2, 0), 1) * 100
+      const color        = ok ? '#44ff88' : '#ff4444'
+
+      if (indicatorRef.current) {
+        indicatorRef.current.style.left       = `${indicatorPct}%`
+        indicatorRef.current.style.background = color
+        indicatorRef.current.style.boxShadow  = `0 0 8px ${color}`
+      }
+      if (zoneRef.current)      zoneRef.current.style.left      = `${targetPct - 12}%`
+      if (targetLineRef.current) targetLineRef.current.style.left = `${targetPct}%`
+      if (trackRef.current)     trackRef.current.style.borderColor = color
+    }
+    rafId = requestAnimationFrame(update)
+    return () => cancelAnimationFrame(rafId)
+  }, [balanceRef])
 
   return (
-    <div style={{ position: 'relative', height: 18, background: '#111', borderRadius: 9, border: `2px solid ${color}`, overflow: 'hidden' }}>
+    <div ref={trackRef} style={{ position: 'relative', height: 18, background: '#111', borderRadius: 9, border: '2px solid #44ff88', overflow: 'hidden' }}>
       {/* 許容ゾーン */}
-      <div style={{
-        position: 'absolute', top: 0, bottom: 0,
-        left: `${targetPct - 12}%`, width: '24%',
-        background: 'rgba(68,255,136,0.15)',
-      }} />
+      <div ref={zoneRef} style={{ position: 'absolute', top: 0, bottom: 0, left: '38%', width: '24%', background: 'rgba(68,255,136,0.15)' }} />
       {/* 目標ライン */}
-      <div style={{
-        position: 'absolute', top: 0, bottom: 0,
-        left: `${targetPct}%`, width: 2,
-        background: '#44ff88', opacity: 0.8,
-      }} />
-      {/* 現在の重心 */}
-      <div style={{
-        position: 'absolute', top: '50%',
-        left: `${indicatorPct}%`,
-        transform: 'translate(-50%, -50%)',
-        width: 14, height: 14, borderRadius: '50%',
-        background: color,
-        boxShadow: `0 0 8px ${color}`,
-        transition: 'left 0.06s ease-out',
-      }} />
+      <div ref={targetLineRef} style={{ position: 'absolute', top: 0, bottom: 0, left: '50%', width: 2, background: '#44ff88', opacity: 0.8 }} />
+      {/* 現在の重心 — transition なし、RAFで直接更新 */}
+      <div ref={indicatorRef} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 14, height: 14, borderRadius: '50%', background: '#44ff88', boxShadow: '0 0 8px #44ff88' }} />
     </div>
   )
 }

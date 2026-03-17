@@ -268,6 +268,8 @@ export default function GameScene({ playerName, onGameOver, wiiBoard }) {
     ok: true,
     boardConnected: false,
   });
+  // React state を経由せず毎フレーム直接書き込む（BalanceMeter の低遅延更新用）
+  const balanceRef = useRef({ copX: 0, calibratedX: 0, targetX: 0, ok: true, boardConnected: false });
   const [lastAction, setLastAction] = useState(null);
   const [targetPoseActive, setTargetPoseActive] = useState(false);
   // ── ランダムポーズ管理 ──
@@ -397,13 +399,8 @@ export default function GameScene({ playerName, onGameOver, wiiBoard }) {
       const diff = Math.abs(targetX - copX);
       const ok = diff < BALANCE_TOLERANCE;
 
-      setBalance({
-        copX,
-        calibratedX,
-        targetX,
-        ok,
-        boardConnected: boardConnectedRef.current,
-      });
+      balanceRef.current = { copX, calibratedX, targetX, ok, boardConnected: boardConnectedRef.current };
+      setBalance({ copX, calibratedX, targetX, ok, boardConnected: boardConnectedRef.current });
 
       if (!ok) {
         if (!imbalanceStartRef.current) {
@@ -452,6 +449,7 @@ export default function GameScene({ playerName, onGameOver, wiiBoard }) {
         score={score}
         lives={lives}
         balance={balance}
+        balanceRef={balanceRef}
         waveLabel={getWaveParams(downlink).label}
         difficultyMultiplier={getWaveParams(downlink).difficultyMultiplier}
         lastAction={lastAction}
