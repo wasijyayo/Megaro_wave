@@ -43,6 +43,14 @@ function CameraController() {
   return null
 }
 
+function ElapsedTimeReporter({ onElapsedTime }) {
+  useFrame((state) => {
+    onElapsedTime?.(state.clock.getElapsedTime())
+  })
+
+  return null
+}
+
 export default function R3FGameCanvas({ waveParams, personCanvas, onElapsedTime }) {
   return (
     <Canvas
@@ -52,6 +60,7 @@ export default function R3FGameCanvas({ waveParams, personCanvas, onElapsedTime 
       dpr={[1, 2]}
     >
       <CameraController />
+      <ElapsedTimeReporter onElapsedTime={onElapsedTime} />
       <color attach="background" args={['#071428']} />
       <BackgroundScene waveParams={waveParams} personCanvas={personCanvas} personTransform={PERSON_TRANSFORM} />
     </Canvas>
