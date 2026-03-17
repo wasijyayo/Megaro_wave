@@ -37,6 +37,7 @@ export default function PersonPlane({
   objectName,
 }: PersonPlaneProps) {
   const meshRef = useRef<THREE.Mesh>(null)
+  const appliedWaveOffsetRef = useRef(0)
 
   const texture = useMemo(() => {
     const t = new THREE.CanvasTexture(canvas)
@@ -57,8 +58,11 @@ export default function PersonPlane({
       const x = pos.x
       const z = pos.z
       const { amplitude = 0.5, frequency = 1.0, speed = 1.0 } = waveParams || {}
-      const y = getWaveHeight(x, z, time, amplitude, frequency, speed)
-      meshRef.current.position.y = y + heightOffset
+      const baseY = pos.y - appliedWaveOffsetRef.current
+      const waveDelta = getWaveHeight(x, z, time, amplitude, frequency, speed)
+      const nextWaveOffset = waveDelta + heightOffset
+      meshRef.current.position.y = baseY + nextWaveOffset
+      appliedWaveOffsetRef.current = nextWaveOffset
     }
   })
 
