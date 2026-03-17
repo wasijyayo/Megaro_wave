@@ -5,7 +5,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { getWaveParams } from '../utils/waveParams'
-import { getTopScores } from '../firebase'
+import { getTopScores, logout } from '../firebase'
 
 // ── Wave アニメーション ──────────────────────────────────
 function WaveBar({ amplitude, index }) {
@@ -70,7 +70,12 @@ export default function HomeScreen({ navigation, route }) {
     <View style={[s.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       {/* ヘッダー */}
       <View style={s.header}>
-        <Text style={s.title}>MEGARO WAVE</Text>
+        <View style={s.headerInner}>
+          <Text style={s.title}>MEGARO WAVE</Text>
+          <TouchableOpacity style={s.logoutBtn} onPress={logout} activeOpacity={0.7}>
+            <Text style={s.logoutText}>ログアウト</Text>
+          </TouchableOpacity>
+        </View>
         <Text style={s.subtitle}>Wii Balance Board × MediaPipe サーフィンゲーム</Text>
       </View>
 
@@ -163,9 +168,12 @@ export default function HomeScreen({ navigation, route }) {
 
 const s = StyleSheet.create({
   root:        { flex: 1, backgroundColor: '#071428' },
-  header:      { alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#1e3a6a' },
+  header:      { paddingVertical: 16, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#1e3a6a', alignItems: 'center' },
+  headerInner: { flexDirection: 'row', alignItems: 'center', width: '100%', justifyContent: 'space-between' },
   title:       { fontSize: 28, fontWeight: '900', color: '#fff', letterSpacing: 2 },
   subtitle:    { fontSize: 11, color: '#666', marginTop: 2 },
+  logoutBtn:   { borderWidth: 1, borderColor: '#334', borderRadius: 6, paddingVertical: 5, paddingHorizontal: 12 },
+  logoutText:  { color: '#888', fontSize: 12 },
   body:        { padding: 12, flexGrow: 1 },
   rowLayout:   { flexDirection: 'row', alignItems: 'flex-start' },
   colLayout:   { flexDirection: 'column' },

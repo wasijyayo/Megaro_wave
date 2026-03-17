@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useContext } from 'react'
 import { getWifiList } from '../firebase.js'
 import { getWaveParams } from '../utils/waveParams.js'
+import { UserContext } from '../contexts/UserContext.js'
 
 const DIFFICULTY_OPTIONS = ['すべて', '湖のように穏やか', '穏やか', '普通', '荒れ', '嵐']
 
@@ -13,13 +14,15 @@ const LABEL_COLOR = {
 }
 
 export default function WifiSelectModal({ onSelect, onClose }) {
+  const user = useContext(UserContext)
   const [wifiList,   setWifiList]   = useState([])
   const [loading,    setLoading]    = useState(true)
   const [filter,     setFilter]     = useState('すべて')
   const [showFilter, setShowFilter] = useState(false)
 
   useEffect(() => {
-    getWifiList('guest').then(list => {
+    const userName = user?.displayName ?? user?.uid ?? 'guest'
+    getWifiList(userName).then(list => {
       setWifiList(list)
       setLoading(false)
     })

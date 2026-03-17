@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useContext } from 'react'
 import { useWifiStats } from '../hooks/useWifiStats.js'
 import { useWiiBoard } from '../hooks/useWiiBoard.js'
 import { getWaveParams } from '../utils/waveParams.js'
-import { getTopScores } from '../firebase.js'
+import { getTopScores, logout } from '../firebase.js'
 import WifiSelectModal from './WifiSelectModal.jsx'
+import { UserContext } from '../contexts/UserContext.js'
 
 // ── 雨の密度設定 ─────────────────────────────────────────
 const RAIN_CONFIG = {
@@ -365,6 +366,7 @@ const LABEL_COLOR = {
 
 // ── HomeScreen ───────────────────────────────────────────
 export default function HomeScreen({ onStart }) {
+  const user = useContext(UserContext)
   const { downlink, supported } = useWifiStats()
   const { connected, sensors, cop, copRef, connect, disconnect, calibrate, sensitivity, setSensitivity, sensorScale, setSensorScale, sensorRate, setSensorRate } = useWiiBoard()
 
@@ -413,6 +415,12 @@ export default function HomeScreen({ onStart }) {
               tilt: {cop.x.toFixed(2)}
             </span>
           )}
+        </div>
+        <div style={s.userArea}>
+          <span style={s.userName}>
+            {user?.displayName ?? (user?.isAnonymous ? 'ゲスト' : user?.email ?? '')}
+          </span>
+          <button style={s.logoutBtn} onClick={logout}>ログアウト</button>
         </div>
       </div>
 
@@ -571,6 +579,13 @@ const s = {
   wiiStatus:  { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 },
   wiiDot:     { width: 8, height: 8, borderRadius: '50%', display: 'inline-block', flexShrink: 0 },
   copDisplay: { fontSize: 11, color: '#4fc3f7', fontFamily: 'monospace', marginLeft: 4 },
+  userArea:   { display: 'flex', alignItems: 'center', gap: 10 },
+  userName:   { fontSize: 12, color: '#888' },
+  logoutBtn:  {
+    background: 'none', border: '1px solid #334',
+    borderRadius: 6, padding: '4px 10px',
+    color: '#666', fontSize: 12, cursor: 'pointer',
+  },
 
   // メイン
   main: {
