@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import R3FGameCanvas  from './R3FGameCanvas.jsx'
 import HUD            from './HUD.jsx'
 import { useWifiStats }  from '../../hooks/useWifiStats.js'
-import { useWiiBoard }   from '../../hooks/useWiiBoard.js'
 import { usePersonPoseAndSegmentation } from '../../hooks/usePersonPoseAndSegmentation.ts'
 import { usePersonSegmentation } from '../../hooks/usePersonSegmentation.ts'
 import { getWaveParams, calcWaveTilt } from '../../utils/waveParams.js'
@@ -13,12 +12,12 @@ const BALANCE_TOLERANCE  = 0.28   // CoP と目標傾きの許容差 (-1〜1)
 const IMBALANCE_TIMEOUT  = 2000   // ms: この時間超えるとライフ -1
 
 // ─────────────────────────────────────────────────────────
-export default function GameScene({ playerName, onGameOver }) {
+export default function GameScene({ playerName, onGameOver, wiiBoard }) {
   const elapsedTimeRef = useRef(0)
 
   // ── hooks ──
   const { downlink }                          = useWifiStats()
-  const { connected: boardConnected, copRef, connect: connectBoard } = useWiiBoard()
+  const { connected: boardConnected, copRef, connect: connectBoard } = wiiBoard
   
   // ポーズ検知フック（骨格描画のみ）
   const { canvas: poseCanvas, status: poseStatus, poseData } = usePersonPoseAndSegmentation()
@@ -149,10 +148,11 @@ export default function GameScene({ playerName, onGameOver }) {
       // ── バランス判定 ──
       const targetX = calcWaveTilt(wpf.amplitude, wpf.frequency, wpf.speed, wpf.turbulence, elapsedTime)
       const copX    = boardConnectedRef.current ? copRef.current.x : 0
+      const calibratedX = boardConnectedRef.current ? copRef.current.x : 0
       const diff    = Math.abs(targetX - copX)
       const ok      = diff < BALANCE_TOLERANCE
 
-      setBalance({ copX, targetX, ok, boardConnected: boardConnectedRef.current })
+      setBalance({ copX, calibratedX, targetX, ok, boardConnected: boardConnectedRef.current })
 
       if (!ok) {
         if (!imbalanceStartRef.current) {
@@ -195,6 +195,7 @@ export default function GameScene({ playerName, onGameOver }) {
         waveLabel={getWaveParams(downlink).label}
         difficultyMultiplier={getWaveParams(downlink).difficultyMultiplier}
         lastAction={lastAction}
+        boardConnected={boardConnected}
       />
 
       <div style={s.maskStatus}>{segStatus} / {poseStatus}</div>

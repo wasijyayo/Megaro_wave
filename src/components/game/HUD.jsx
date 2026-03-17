@@ -1,6 +1,6 @@
 const TOTAL_LIVES = 3
 
-export default function HUD({ score, lives, balance, waveLabel, difficultyMultiplier, lastAction }) {
+export default function HUD({ score, lives, balance, waveLabel, difficultyMultiplier, lastAction, boardConnected }) {
   return (
     <div style={s.root}>
       {/* 左上: ライフ */}
@@ -39,7 +39,7 @@ export default function HUD({ score, lives, balance, waveLabel, difficultyMultip
       <div style={{ position: 'absolute', bottom: 28, left: '50%', transform: 'translateX(-50%)', width: 240, textAlign: 'center' }}>
         <div style={{ ...s.label, marginBottom: 6 }}>BALANCE</div>
         <BalanceMeter balance={balance} />
-        {!balance.boardConnected && (
+        {!boardConnected && (
           <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
             Wii Board 未接続 (中央固定)
           </div>
@@ -58,8 +58,9 @@ export default function HUD({ score, lives, balance, waveLabel, difficultyMultip
 }
 
 function BalanceMeter({ balance }) {
-  const { copX, targetX, ok } = balance
-  const indicatorPct = Math.min(Math.max((copX    + 1) / 2, 0), 1) * 100
+  const { copX, targetX, ok, calibratedX } = balance
+  const displayX = Number.isFinite(calibratedX) ? calibratedX : copX
+  const indicatorPct = Math.min(Math.max((displayX + 1) / 2, 0), 1) * 100
   const targetPct    = Math.min(Math.max((targetX + 1) / 2, 0), 1) * 100
   const color        = ok ? '#44ff88' : '#ff4444'
 
