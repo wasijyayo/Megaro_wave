@@ -9,7 +9,7 @@ function lerp(a, b, t) {
 export function getWaveParams(downlink) {
   const t = Math.min(downlink, 100) / 100;
 
-  const amplitude = lerp(0.15, 2.8, t);
+  const amplitude = lerp(0.15, 1.8, t);
   const frequency = lerp(0.3, 1.8, t);
   const speed = lerp(0.4, 3.0, t);
   const turbulence = lerp(0.0, 1.0, t);
@@ -65,4 +65,14 @@ export function calcWaveTilt(
 
   // tanh で -1 〜 +1 に正規化
   return Math.tanh(slope * 0.3);
+}
+
+/**
+ * 任意座標の波の高さを計算して返すユーティリティ
+ * x, z: シーン内の座標
+ * time: 経過時間
+ */
+export function getWaveHeight(x, z, time, amplitude = 0.5, frequency = 1.0, speed = 1.0) {
+  // x方向のみで波高を計算
+  return Math.sin(x * frequency + time * speed) * amplitude;
 }
