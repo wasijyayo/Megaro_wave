@@ -60,6 +60,7 @@ export default function BattleGameScene({
         waveParamsOverride={waveParamsOverride}
         onGameOver={handleGameOver}
         onScoreChange={handleScoreChange}
+        remoteVideoTrack={remoteVideoTrack}
       />
 
       {/* 相手の映像 + スコア */}
