@@ -26,10 +26,10 @@ const decoder = new TextDecoder()
  * @param {(msg: object) => void} onMessage - データチャンネル受信コールバック
  */
 export function useLiveKitBattle({ onMessage } = {}) {
-  const roomRef        = useRef(null)
-  const connectingRef  = useRef(false)  // 接続処理中フラグ（二重接続防止）
-  const cameraRef      = useRef(null)   // 公開済みカメラトラック
-  const onMsgRef       = useRef(onMessage)
+  const roomRef           = useRef(null)
+  const connectPromiseRef = useRef(null) // 接続中の Promise（二重接続を待機に変える）
+  const cameraRef         = useRef(null) // 公開済みカメラトラック
+  const onMsgRef          = useRef(onMessage)
 
   const [connected,          setConnected]          = useState(false)
   const [remoteParticipant,  setRemoteParticipant]  = useState(null)
@@ -40,14 +40,23 @@ export function useLiveKitBattle({ onMessage } = {}) {
 
   // ── 接続 ─────────────────────────────────────────────
   const connect = useCallback(async (roomName) => {
-    if (roomRef.current || connectingRef.current) return // 二重接続防止
-    connectingRef.current = true
+    if (roomRef.current) return // 接続済み
+
+    // 接続中なら完了を待つ（StrictModeの二重実行で2回目がpublishCameraを空振りするのを防ぐ）
+    if (connectPromiseRef.current) {
+      await connectPromiseRef.current
+      return
+    }
+
+    let resolveFn, rejectFn
+    connectPromiseRef.current = new Promise((res, rej) => { resolveFn = res; rejectFn = rej })
 
     let token, url
     try {
       ;({ token, url } = await getLiveKitToken(roomName))
     } catch (e) {
-      connectingRef.current = false
+      connectPromiseRef.current = null
+      rejectFn(e)
       throw e
     }
 
@@ -94,14 +103,20 @@ export function useLiveKitBattle({ onMessage } = {}) {
       setConnected(false)
       setRemoteParticipant(null)
       setRemoteVideoTrack(null)
-      roomRef.current    = null
-      connectingRef.current = false
-      cameraRef.current  = null
+      roomRef.current         = null
+      connectPromiseRef.current = null
+      cameraRef.current       = null
     })
 
-    await room.connect(url, token)
+    try {
+      await room.connect(url, token)
+    } catch (e) {
+      connectPromiseRef.current = null
+      rejectFn(e)
+      throw e
+    }
+
     roomRef.current = room
-    connectingRef.current = false
     setConnected(true)
 
     // すでに参加済みの参加者を反映（ルームに入る前に誰かがいた場合）
@@ -120,6 +135,10 @@ export function useLiveKitBattle({ onMessage } = {}) {
         }
       })
     }
+
+    // 接続完了を通知（待機中の呼び出し元が publishCamera() を続行できる）
+    resolveFn()
+    connectPromiseRef.current = null
   }, [])
 
   // ── カメラ公開 ─────────────────────────────────────
@@ -144,9 +163,9 @@ export function useLiveKitBattle({ onMessage } = {}) {
   // ── 切断 ──────────────────────────────────────────
   const disconnect = useCallback(async () => {
     await roomRef.current?.disconnect()
-    roomRef.current       = null
-    connectingRef.current = false
-    cameraRef.current     = null
+    roomRef.current           = null
+    connectPromiseRef.current = null
+    cameraRef.current         = null
     setConnected(false)
     setRemoteParticipant(null)
     setRemoteVideoTrack(null)
