@@ -7,29 +7,6 @@ function clampNumber(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback
 }
 
-function normalizeDigits(values) {
-  if (Array.isArray(values)) {
-    const digits = values
-      .map((value) => Math.abs(Math.floor(clampNumber(value, 1))) % 10)
-      .map((value) => (value === 0 ? 1 : value))
-    return digits.length > 0 ? digits : [1]
-  }
-
-  const raw = String(values ?? '')
-    .match(/\d/g)
-    ?.map((digit) => (digit === '0' ? 1 : Number(digit)))
-    .filter((digit) => Number.isFinite(digit) && digit > 0) ?? []
-
-  return raw.length > 0 ? raw : [1]
-}
-
-export function buildRepeatingPattern(values, length = 12) {
-  const source = normalizeDigits(values)
-  const size = Math.max(1, Math.floor(clampNumber(length, 12)))
-
-  return Array.from({ length: size }, (_, index) => source[index % source.length])
-}
-
 // React Native側で strokeCount が共通インポートできる前提がなかったため、
 // モバイル側は簡易的に文字列から数値を抽出する元のロジックをベースに、
 // 「SSIDの各文字のコードポイントなどを元にした配列」か「空なら[1]」を返す形に変更。
@@ -74,20 +51,24 @@ export function getWaveParams(input) {
   const speedT = Math.min(Math.max(downlink, 0), 100) / 100
   const strengthT = Math.min(Math.max(strength, 0), 100) / 100
 
-  const amplitude           = lerp(0.15, 2.8, speedT)
-  const frequency           = lerp(1.8, 0.3, strengthT)
-  const speed               = lerp(0.4, 3.0, speedT)
-  const waveSpacing         = lerp(0.4, 2.2, strengthT)
+  const amplitude           = lerp(0.15, 0.5, speedT) * 0.15
+  const frequency           = lerp(0.1, 0.3, strengthT) * 0.3
+  const speed               = lerp(0.4, 0.5, speedT) * 0.2
+  const waveSpacing         = lerp(0.5, 1.2, strengthT)
   const turbulence          = lerp(0.0, 1.0, speedT)
   const difficultyMultiplier = lerp(1.0, 5.0, speedT)
   const heightPattern = getWaveHeightPattern(ssid, heightPatternLength)
 
-  const label =
-    downlink < 5  ? '湖のように穏やか' :
-    downlink < 20 ? '穏やか'           :
-    downlink < 50 ? '普通'             :
-    downlink < 80 ? '荒れ'             :
-                    '嵐'
+  let label = '嵐'
+  if (downlink < 5) {
+    label = '湖のように穏やか'
+  } else if (downlink < 20) {
+    label = '穏やか'
+  } else if (downlink < 50) {
+    label = '普通'
+  } else if (downlink < 80) {
+    label = '荒れ'
+  }
 
   return { amplitude, frequency, speed, waveSpacing, turbulence, difficultyMultiplier, label, ssid, heightPattern }
 }

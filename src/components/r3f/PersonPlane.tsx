@@ -93,23 +93,20 @@ export default function PersonPlane({
         // 波の目標傾き（-1..1 に正規化）を計算
         const waveTarget = calcWaveTilt(amplitude, frequency, speed, turbulence, time)
 
-        // X: 左右 (-1..1) -> rotation around Z (roll)
-        // 傾きは (cop.x - waveTarget) の差分に基づく。差が0なら水平を保つ。
-        // 左右方向の符号を反転（Wiiボードの座標系に合わせる）
-        const targetZ = (waveTarget - (cop.x ?? 0)) * 0.5        // Y: 前後 (-1..1) -> rotation around X (pitch)
-        const targetX = (cop.y ?? 0) * 0.25
+        const rollDiff = waveTarget - (cop.x ?? 0)
+        const amplifiedRoll = Math.sign(rollDiff) * Math.pow(Math.abs(rollDiff), 0.9) * 1.8
+        const targetZ = amplifiedRoll
+        const targetX = (cop.y ?? 0) * 0.35
 
-        // スムーズに補間
         const gr = groupRef.current.rotation
-        gr.z = THREE.MathUtils.lerp(gr.z, targetZ, 0.08)
-        gr.x = THREE.MathUtils.lerp(gr.x, targetX, 0.08)
+        gr.z = THREE.MathUtils.lerp(gr.z, targetZ, 0.28)
+        gr.x = THREE.MathUtils.lerp(gr.x, targetX, 0.18)
 
-        // サーフボードは少し角度を大きめに反映
         if (surfboardRef.current) {
           const sr = surfboardRef.current.rotation
           const baseX = -Math.PI / 2
-          sr.x = THREE.MathUtils.lerp(sr.x, baseX + targetX * 0.9, 0.12)
-          sr.z = THREE.MathUtils.lerp(sr.z, targetZ * 0.9, 0.12)
+          sr.x = THREE.MathUtils.lerp(sr.x, baseX + targetX * 1.1, 0.3)
+          sr.z = THREE.MathUtils.lerp(sr.z, targetZ * 1.1, 0.3)
         }
       }
     }
@@ -122,7 +119,7 @@ export default function PersonPlane({
 
   const group = (
     <group ref={groupRef} position={position} rotation={rotation} scale={scale}>
-      <mesh name={objectName ?? 'PersonPlane'} ref={meshRef} position={[0, 0, 0.1]}>
+      <mesh name={objectName ?? 'PersonPlane'} ref={meshRef} position={[0, 0.2, 0.1]}>
         <planeGeometry args={[ASPECT * PLANE_HEIGHT, PLANE_HEIGHT]} />
         <meshBasicMaterial map={texture} transparent depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
@@ -134,7 +131,7 @@ export default function PersonPlane({
           <group
             ref={surfboardRef}
             name="Surfboard"
-            position={[0, (-PLANE_HEIGHT / 2 - SURFBOARD_THICKNESS / 2 - surfboardGap) + 0.7, 0]}
+            position={[0, (-PLANE_HEIGHT / 2 - SURFBOARD_THICKNESS / 2 - surfboardGap) + 0.7, 0.5]}
             rotation={[-Math.PI / 2, 0, 0]}
           >
             {/* clone() をやめて同じオブジェクト参照を使い、primitive に直接 scale を渡す */}
@@ -145,7 +142,7 @@ export default function PersonPlane({
           <mesh
             ref={surfboardRef}
             name="Surfboard"
-            position={[0, (-PLANE_HEIGHT / 2 - SURFBOARD_THICKNESS / 2 - surfboardGap) + 0.7, 0]}
+            position={[0, (-PLANE_HEIGHT / 2 - SURFBOARD_THICKNESS / 2 - surfboardGap) + 0.7, 0.5]}
             rotation={[-Math.PI / 2, 0, 0]}
           >
             <boxGeometry args={[SURFBOARD_LENGTH, SURFBOARD_THICKNESS, SURFBOARD_WIDTH]} />
