@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import R3FGameCanvas from "./R3FGameCanvas.jsx";
 import HUD from "./HUD.jsx";
 import PoseClearEffects from "./PoseClearEffects.jsx";
@@ -7,6 +7,7 @@ import { useWiiBoard } from "../../hooks/useWiiBoard.js";
 import { usePersonPoseAndSegmentation } from "../../hooks/usePersonPoseAndSegmentation.ts";
 import { usePersonSegmentation } from "../../hooks/usePersonSegmentation.ts";
 import { getWaveParams, calcWaveTilt } from "../../utils/waveParams.js";
+import { ssidToStrokeArray } from "../../utils/strokeCount.js";
 import { playSuccessChime } from "../../utils/poseClearSounds.js";
 
 // ── 定数 ──────────────────────────────────────────────────
@@ -185,12 +186,24 @@ function checkPose(poseId, lm) {
 }
 
 // ─────────────────────────────────────────────────────────
-export default function GameScene({ playerName, onGameOver, wiiBoard, waveParamsOverride, onScoreChange }) {
+export default function GameScene({ playerName, onGameOver, wiiBoard, waveParamsOverride, onScoreChange, selectedWifi }) {
   const elapsedTimeRef = useRef(0);
 
   // ── hooks ──
   const { downlink } = useWifiStats();
   const { connected: boardConnected, copRef, connect: connectBoard } = wiiBoard;
+
+  const effectiveWaveParams = useMemo(() => {
+    if (waveParamsOverride) return waveParamsOverride;
+    if (selectedWifi) {
+      return getWaveParams({
+        downlink: selectedWifi.fast,
+        strength: selectedWifi.fast,
+        ssid: selectedWifi.ssid
+      });
+    }
+    return getWaveParams(downlink);
+  }, [waveParamsOverride, selectedWifi, downlink]);
 
   // ポーズ検知フック（骨格描画のみ）
   const {
@@ -283,16 +296,16 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
   const scoreRef = useRef(0);
   const livesRef = useRef(TOTAL_LIVES);
   const imbalanceStartRef = useRef(null);
-  const waveParamsRef = useRef(getWaveParams(downlink));
+  const waveParamsRef = useRef(effectiveWaveParams);
   const boardConnectedRef = useRef(false);
   const lastActionRef = useRef(null);
   const targetPoseActiveRef = useRef(false);
   const currentPoseRef = useRef(currentPose);
 
-  // waveParams を ref に同期（対戦時は override を優先）
+  // waveParams を ref に同期
   useEffect(() => {
-    waveParamsRef.current = waveParamsOverride ?? getWaveParams(downlink);
-  }, [downlink, waveParamsOverride]);
+    waveParamsRef.current = effectiveWaveParams;
+  }, [effectiveWaveParams]);
 
   // onScoreChange コールバックを ref で保持（再レンダー不要）
   const onScoreChangeRef = useRef(onScoreChange);
@@ -312,8 +325,21 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
     currentPoseRef.current = currentPose;
   }, [currentPose]);
 
+  // ── ゲーム準備チェック ──
+  const [apiReady, setApiReady] = useState(false);
+  useEffect(() => {
+    setApiReady(false);
+    ssidToStrokeArray(waveParamsRef.current.ssid).then(() => {
+      setApiReady(true);
+    });
+  }, [waveParamsRef.current.ssid]);
+
+  const isGameReady = apiReady && poseStatus === "実行中" && segStatus === "実行中";
+
   // ── メインゲームループ ──
   useEffect(() => {
+    if (!isGameReady) return;
+
     let rafId;
 
     const loop = (timestamp) => {
@@ -450,7 +476,7 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
 
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
-  }, [copRef, onGameOver]);
+  }, [copRef, onGameOver, isGameReady]);
 
   useEffect(() => {
     if (comboRef.current <= 0 || comboExpiryRef.current <= 0) {
@@ -480,7 +506,7 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
       }}
     >
       <R3FGameCanvas
-        waveParams={getWaveParams(downlink)}
+        waveParams={effectiveWaveParams}
         personCanvas={combinedCanvas}
         calibratedRef={copRef}
         onElapsedTime={(t) => {
@@ -494,8 +520,8 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
         lives={lives}
         balance={balance}
         balanceRef={balanceRef}
-        waveLabel={getWaveParams(downlink).label}
-        difficultyMultiplier={getWaveParams(downlink).difficultyMultiplier}
+        waveLabel={effectiveWaveParams.label}
+        difficultyMultiplier={effectiveWaveParams.difficultyMultiplier}
         combo={combo}
         comboExpiryTime={comboExpiryTime}
         comboDuration={COMBO_TIMEOUT}
@@ -510,6 +536,16 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
       <div style={s.maskStatus}>
         {segStatus} / {poseStatus}
       </div>
+
+      {/* ロード画面（準備中） */}
+      {!isGameReady && (
+        <div style={s.loadingOverlay}>
+          <h2>NOW LOADING...</h2>
+          <p>API: {apiReady ? "OK" : "Heating..."}</p>
+          <p>Pose: {poseStatus}</p>
+          <p>Segment: {segStatus}</p>
+        </div>
+      )}
 
       {/* Wii Board 接続ボタン */}
       {!boardConnected && (
@@ -535,6 +571,21 @@ const s = {
     pointerEvents: "none",
     lineHeight: 1.5,
     zIndex: 20,
+  },
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    color: "#fff",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+    fontFamily: "monospace",
+    zIndex: 50,
   },
   boardBtn: {
     position: "absolute",

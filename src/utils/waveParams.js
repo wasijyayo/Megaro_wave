@@ -84,6 +84,7 @@ export function getWaveParams(input) {
   const turbulence = lerp(0.0, 1.0, speedT);
   const difficultyMultiplier = lerp(1.0, 5.0, speedT);
   const heightPattern = getWaveHeightPattern(ssid, heightPatternLength);
+  console.log("bug WaveParams ===", { ssid, heightPattern });
 
   const label =
     downlink < 5
@@ -157,11 +158,26 @@ export function getWaveHeight(
   const pattern = Array.isArray(heightPattern) && heightPattern.length > 0
     ? heightPattern
     : [1];
-  const maxDigit = Math.max(...pattern.map((value) => Math.max(1, clampNumber(value, 1))));
-  const spacing = Math.max(0.001, 1 / Math.max(frequency, 0.001));
-  const patternIndex = Math.abs(Math.floor((x + time * speed) / spacing)) % pattern.length;
-  const heightScale = Math.max(1, clampNumber(pattern[patternIndex], 1)) / maxDigit;
+  
+  // シェーダーのロジックと完全に一致させるための位相計算
+  const arg = x * frequency + time * speed;
+  const cycleIndex = arg / (2.0 * Math.PI);
+
+  const getPatternAt = (index) => {
+    let pIdx = Math.floor(index) % pattern.length;
+    if (pIdx < 0) pIdx += pattern.length; // 負の剰余対応
+    return Math.max(1, clampNumber(pattern[pIdx], 1));
+  };
+
+  const fIdx0 = Math.floor(cycleIndex);
+  const h0 = getPatternAt(fIdx0);
+  const h1 = getPatternAt(fIdx0 + 1);
+
+  // 小数部分を使って smoothstep (スプライン曲線近似) 補間
+  const fractPart = cycleIndex - fIdx0;
+  const t = fractPart * fractPart * (3.0 - 2.0 * fractPart);
+  const heightScale = h0 + (h1 - h0) * t;
 
   // x方向のみで波高を計算
-  return Math.sin(x * frequency + time * speed) * amplitude * heightScale;
+  return Math.sin(arg) * amplitude * heightScale;
 }
