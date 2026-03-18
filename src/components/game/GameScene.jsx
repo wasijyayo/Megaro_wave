@@ -20,6 +20,9 @@ const POSE_LIST = [
   { id: "hands-up", label: "両手を挙げる", points: 1000 },
   { id: "salute", label: "敬礼", points: 1000 },
   { id: "running-man", label: "ランニングマン", points: 1000 },
+  { id: "right-up-left-side", label: "右手を上、左手を横", points: 1000 },
+  { id: "hands-back", label: "後ろで手を組む", points: 1000 },
+  { id: "double-biceps", label: "両腕を曲げて力こぶ", points: 1000 },
 ];
 
 /** 現在と異なるランダムなポーズを返す */
@@ -116,13 +119,10 @@ function isSalutePose(lm) {
   const leftWrist = lm[15],
     rightWrist = lm[16];
 
-  // 右手首が右目の近く
   const rightWristNearEye =
     Math.abs(rightWrist.x - rightEye.x) < 0.12 &&
     Math.abs(rightWrist.y - rightEye.y) < 0.12;
-  // 右肘が肩より高い
   const rightElbowRaised = rightElbow.y < rightShoulder.y + 0.1;
-  // 左手首が肩より下
   const leftArmDown = leftWrist.y > leftShoulder.y + 0.1;
 
   return rightWristNearEye && rightElbowRaised && leftArmDown;
@@ -149,15 +149,13 @@ function isRunningManPose(lm) {
 
   const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
 
-  // パターン A: 右腕が上、左腕が下
   const rightArmUp =
-    rightWrist.y < shoulderY - 0.05 &&       // 手首が肩より上
-    rightElbow.y < rightShoulder.y + 0.05;    // 肘も肩より上
+    rightWrist.y < shoulderY - 0.05 &&
+    rightElbow.y < rightShoulder.y + 0.05;
   const leftArmDown =
-    leftWrist.y > leftShoulder.y + 0.05 &&    // 手首が肩より下
-    leftElbow.y > leftShoulder.y - 0.05;      // 肘が肩付近～下
+    leftWrist.y > leftShoulder.y + 0.05 &&
+    leftElbow.y > leftShoulder.y - 0.05;
 
-  // パターン B: 左腕が上、右腕が下（逆パターン）
   const leftArmUp =
     leftWrist.y < shoulderY - 0.05 &&
     leftElbow.y < leftShoulder.y + 0.05;
@@ -166,6 +164,103 @@ function isRunningManPose(lm) {
     rightElbow.y > rightShoulder.y - 0.05;
 
   return (rightArmUp && leftArmDown) || (leftArmUp && rightArmDown);
+}
+
+function isRightUpLeftSidePose(lm) {
+  if (
+    !lm?.[0] ||
+    !lm?.[12] ||
+    !lm?.[14] ||
+    !lm?.[16]
+  ) {
+    return false;
+  }
+
+  const nose = lm[0];
+  const rightShoulder = lm[12];
+  const rightElbow = lm[14];
+  const rightWrist = lm[16];
+  const dx = rightWrist.x - rightShoulder.x;
+  const dy = rightWrist.y - rightShoulder.y;
+  const armLength = Math.hypot(dx, dy);
+
+  const rightArmUp =
+    rightWrist.y < nose.y + 0.18 &&
+    rightElbow.y < rightShoulder.y + 0.24 &&
+    dy < -0.22 &&
+    dx > 0.02 &&
+    armLength > 0.32;
+
+  return rightArmUp;
+}
+
+function isHandsBackPose(lm) {
+  if (
+    !lm?.[11] ||
+    !lm?.[12] ||
+    !lm?.[13] ||
+    !lm?.[14] ||
+    !lm?.[15] ||
+    !lm?.[16] ||
+    !lm?.[23] ||
+    !lm?.[24]
+  ) {
+    return false;
+  }
+
+  const leftShoulder = lm[11], rightShoulder = lm[12];
+  const leftElbow = lm[13], rightElbow = lm[14];
+  const leftWrist = lm[15], rightWrist = lm[16];
+  const leftHip = lm[23], rightHip = lm[24];
+
+  const shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
+  const shoulderCenterY = (leftShoulder.y + rightShoulder.y) / 2;
+  const hipCenterY = (leftHip.y + rightHip.y) / 2;
+  const shoulderSpan = Math.abs(rightShoulder.x - leftShoulder.x);
+
+  const wristsBehindBack =
+    Math.abs(leftWrist.x - shoulderCenterX) < shoulderSpan * 0.45 &&
+    Math.abs(rightWrist.x - shoulderCenterX) < shoulderSpan * 0.45 &&
+    leftWrist.y > shoulderCenterY + 0.02 &&
+    rightWrist.y > shoulderCenterY + 0.02 &&
+    leftWrist.y < hipCenterY + 0.16 &&
+    rightWrist.y < hipCenterY + 0.16;
+
+  const elbowsBack =
+    leftElbow.y > leftShoulder.y &&
+    rightElbow.y > rightShoulder.y &&
+    Math.abs(leftElbow.x - shoulderCenterX) < shoulderSpan * 0.8 &&
+    Math.abs(rightElbow.x - shoulderCenterX) < shoulderSpan * 0.8;
+
+  return wristsBehindBack && elbowsBack;
+}
+
+function isDoubleBicepsPose(lm) {
+  if (
+    !lm?.[11] ||
+    !lm?.[12] ||
+    !lm?.[13] ||
+    !lm?.[14] ||
+    !lm?.[15] ||
+    !lm?.[16]
+  ) {
+    return false;
+  }
+
+  const leftShoulder = lm[11], rightShoulder = lm[12];
+  const leftElbow = lm[13], rightElbow = lm[14];
+  const leftWrist = lm[15], rightWrist = lm[16];
+  const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
+
+  const leftArmFlex =
+    Math.abs(leftElbow.y - shoulderY) < 0.14 &&
+    leftWrist.y < leftShoulder.y;
+
+  const rightArmFlex =
+    Math.abs(rightElbow.y - shoulderY) < 0.14 &&
+    rightWrist.y < rightShoulder.y;
+
+  return leftArmFlex && rightArmFlex;
 }
 
 /** ポーズIDに応じた判定関数のディスパッチ */
@@ -179,6 +274,12 @@ function checkPose(poseId, lm) {
       return isSalutePose(lm);
     case "running-man":
       return isRunningManPose(lm);
+    case "right-up-left-side":
+      return isRightUpLeftSidePose(lm);
+    case "hands-back":
+      return isHandsBackPose(lm);
+    case "double-biceps":
+      return isDoubleBicepsPose(lm);
     default:
       return false;
   }
