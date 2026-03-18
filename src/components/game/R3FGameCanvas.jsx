@@ -9,7 +9,7 @@ const CAMERA_TARGET = [0, -0.35, 0.25]
 const PERSON_TRANSFORM = {
   position: [0, -0.6, 1.8],
   rotation: [-Math.atan2(CAMERA_POSITION[1] - CAMERA_TARGET[1], CAMERA_POSITION[2] - CAMERA_TARGET[2]), 0, 0],
-  scale: [1.95, 1.7, 1.7],
+  scale: [2.4, 1.7, 1.7],
 }
 
 

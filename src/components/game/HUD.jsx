@@ -180,13 +180,10 @@ function TargetPosePreview({ poseId, active }) {
       return (
         <svg width="96" height="140" viewBox="0 0 96 140" aria-hidden="true">
           {head}{neck}{shoulders}{torso}{hips}{legs}
-          {/* 左腕: 肩→肘→頭後ろ */}
           <path d="M32 28 L20 20" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
           <path d="M20 20 Q32 10 42 14" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          {/* 右腕: 肩→肘→頭後ろ */}
           <path d="M64 28 L76 20" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
           <path d="M76 20 Q64 10 54 14" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          {/* 手(後頭部) */}
           <path d="M42 14 L46 16" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" opacity="0.7" />
           <path d="M54 14 L50 16" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" opacity="0.7" />
         </svg>
@@ -197,9 +194,7 @@ function TargetPosePreview({ poseId, active }) {
       return (
         <svg width="96" height="140" viewBox="0 0 96 140" aria-hidden="true">
           {head}{neck}{shoulders}{torso}{hips}{legs}
-          {/* 左腕: 肩→肘→上 */}
           <path d="M32 28 L22 16 L16 2" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          {/* 右腕: 肩→肘→上 */}
           <path d="M64 28 L74 16 L80 2" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
         </svg>
       )
@@ -209,9 +204,7 @@ function TargetPosePreview({ poseId, active }) {
       return (
         <svg width="96" height="140" viewBox="0 0 96 140" aria-hidden="true">
           {head}{neck}{shoulders}{torso}{hips}{legs}
-          {/* 右手: 肩→肘→額に当てる敬礼 */}
           <path d="M64 28 L76 20 L58 10" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          {/* 左手: 肩→肘→体の横に下ろす */}
           <path d="M32 28 L20 46 L16 72" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
         </svg>
       )
@@ -221,11 +214,47 @@ function TargetPosePreview({ poseId, active }) {
       return (
         <svg width="96" height="140" viewBox="0 0 96 140" aria-hidden="true">
           {head}{neck}{shoulders}{torso}{hips}{legs}
-          {/* 右腕: 肩→肘→右上に伸ばす */}
           <path d="M64 28 L78 16 L90 4" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          {/* 左腕: 肩→肘（左下）→前腕（折り返し） */}
           <path d="M32 28 L18 44" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
           <path d="M18 44 L36 28" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+        </svg>
+      )
+
+    // ── 右手を上、左手を横 ──
+    case 'right-up-left-side':
+      return (
+        <svg width="96" height="140" viewBox="0 0 96 140" aria-hidden="true">
+          {head}{neck}{shoulders}{torso}{hips}{legs}
+          <path d="M32 28 L14 32 L2 36" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M64 28 L72 10 L74 -6" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+        </svg>
+      )
+
+    // ── 両腕を曲げて力こぶ ──
+    case 'double-biceps':
+      return (
+        <svg width="96" height="140" viewBox="0 0 96 140" aria-hidden="true">
+          {head}{neck}{shoulders}{torso}{hips}{legs}
+          <path d="M32 28 L20 28 L26 10" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M64 28 L76 28 L70 10" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+        </svg>
+      )
+
+    // ── 後ろで手を組む ──
+    case 'hands-back':
+      return (
+        <svg width="96" height="140" viewBox="0 0 96 140" aria-hidden="true">
+          {head}
+          <path d="M48 23 L48 28" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M30 28 L62 28" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M30 30 L40 76" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M62 30 L52 76" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M40 76 L52 76" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M30 30 L34 54 L46 62" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M62 30 L58 54 L46 62" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M46 62 L50 62" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M40 76 L34 98 L30 122" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M52 76 L58 98 L62 122" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
         </svg>
       )
 
