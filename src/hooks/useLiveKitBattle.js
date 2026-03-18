@@ -141,15 +141,22 @@ export function useLiveKitBattle({ onMessage } = {}) {
     connectPromiseRef.current = null
   }, [])
 
-  // ── カメラ公開 ─────────────────────────────────────
-  const publishCamera = useCallback(async () => {
+// ── カメラ公開 ─────────────────────────────────────
+  // 引数に customTrack を受け取れるように変更します
+  const publishCamera = useCallback(async (customTrack = null) => {
     const room = roomRef.current
     if (!room || cameraRef.current) return // 二重公開防止
-    const track = await createLocalVideoTrack({
-      resolution: VideoPresets.h360.resolution,
-    })
-    await room.localParticipant.publishTrack(track)
-    cameraRef.current = track
+
+    let trackToPublish = customTrack
+    if (!trackToPublish) {
+      // カスタム映像が渡されなかった場合は、今まで通りWebカメラを取得します
+      trackToPublish = await createLocalVideoTrack({
+        resolution: VideoPresets.h360.resolution, // 360p（負荷軽減）
+      })
+    }
+
+    await room.localParticipant.publishTrack(trackToPublish)
+    cameraRef.current = trackToPublish
   }, [])
 
   // ── データ送信 ─────────────────────────────────────
