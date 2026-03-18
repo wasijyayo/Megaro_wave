@@ -62,7 +62,11 @@ export default function BattleWaitingScreen({ roomName, isHost, liveKit, onGameS
   // ホストがゲームを開始する
   const handleStart = () => {
     if (!canStart) return
-    const waveParams = getWaveParams(selectedWifi.fast)
+    const waveParams = getWaveParams({
+      downlink: selectedWifi.fast,
+      strength: selectedWifi.fast,
+      ssid: selectedWifi.ssid,
+    })
     sendMessage({ type: MSG.START, waveParams, wifiLabel: selectedWifi.ssid })
     onGameStart(waveParams, selectedWifi.ssid)
   }
@@ -148,7 +152,9 @@ export default function BattleWaitingScreen({ roomName, isHost, liveKit, onGameS
           <div style={{ marginTop: 28 }}>
             <div style={s.sectionLabel}>ステージ選択（WiFi）</div>
             <button style={s.btnWifi} onClick={() => setShowWifiModal(true)}>
-              {selectedWifi ? `${selectedWifi.ssid}（${getWaveParams(selectedWifi.fast).label}）` : 'WiFiを選択...'}
+              {selectedWifi
+                ? `${selectedWifi.ssid}（${getWaveParams({ downlink: selectedWifi.fast, strength: selectedWifi.fast, ssid: selectedWifi.ssid }).label}）`
+                : 'WiFiを選択...'}
             </button>
 
             {!opponentJoined && (

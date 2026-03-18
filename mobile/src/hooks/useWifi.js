@@ -56,7 +56,15 @@ export function useWifi() {
     }
   }, [])
 
-  return { ssid, linkSpeed, frequency, status, error, fetch }
+  return {
+    ssid,
+    linkSpeed,
+    strength: linkSpeed,
+    frequency,
+    status,
+    error,
+    fetch,
+  }
 }
 
 /**

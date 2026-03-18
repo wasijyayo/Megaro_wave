@@ -23,7 +23,7 @@ const LABEL_COLOR = {
 
 // Firebase保存済みWiFiの行
 function SavedWifiRow({ item, onSelect }) {
-  const params = getWaveParams(item.fast)
+  const params = getWaveParams({ downlink: item.fast, strength: item.fast, ssid: item.ssid })
   return (
     <TouchableOpacity style={s.savedRow} onPress={() => onSelect(item)} activeOpacity={0.7}>
       <View style={s.rowLeft}>
@@ -35,6 +35,9 @@ function SavedWifiRow({ item, onSelect }) {
           {params.label}
         </Text>
       </View>
+      <View style={s.rowCenter}>
+        <Text style={s.rowMulti}>{params.waveSpacing.toFixed(2)}</Text>
+      </View>
       <View style={s.rowRight}>
         <Text style={s.selectText}>選択 →</Text>
       </View>
@@ -45,7 +48,7 @@ function SavedWifiRow({ item, onSelect }) {
 // スキャン結果の行（保存用）
 function WifiRow({ item, onSave }) {
   const mbps   = rssiToMbps(item.level)
-  const params = getWaveParams(mbps)
+  const params = getWaveParams({ downlink: mbps, strength: mbps, ssid: item.SSID })
   return (
     <TouchableOpacity style={s.row} onPress={() => onSave(item, mbps)} activeOpacity={0.7}>
       <View style={s.rowLeft}>
@@ -56,6 +59,9 @@ function WifiRow({ item, onSave }) {
         <Text style={[s.rowLabel, { color: LABEL_COLOR[params.label] ?? '#fff' }]}>
           {params.label}
         </Text>
+      </View>
+      <View style={s.rowCenter}>
+        <Text style={s.rowMulti}>{params.waveSpacing.toFixed(2)}</Text>
       </View>
       <View style={s.rowRight}>
         <Text style={s.rowMulti}>x{params.difficultyMultiplier.toFixed(1)}倍</Text>
@@ -94,7 +100,7 @@ export default function WifiSelectScreen({ navigation }) {
 
   const filtered = (filter === 'すべて' ? list : list.filter(item => {
     const mbps   = rssiToMbps(item.level)
-    const params = getWaveParams(mbps)
+    const params = getWaveParams({ downlink: mbps, strength: mbps, ssid: item.SSID })
     return params.label === filter
   })).filter(item => !hiddenSSIDs.has(item.SSID))
 
@@ -155,6 +161,7 @@ export default function WifiSelectScreen({ navigation }) {
       <View style={[s.colHeader, isTablet && s.colHeaderTablet]}>
         <Text style={[s.colText, { flex: 2 }]}>SSID</Text>
         <Text style={[s.colText, { flex: 1 }]}>難易度</Text>
+          <Text style={[s.colText, { flex: 1 }]}>間隔</Text>
         <Text style={[s.colText, { flex: 1 }]}>得点倍率</Text>
       </View>
 

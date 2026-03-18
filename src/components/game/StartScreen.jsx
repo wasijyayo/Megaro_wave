@@ -19,6 +19,7 @@ export default function StartScreen({ onStart }) {
         <div style={{ display: 'flex', gap: 24, justifyContent: 'center', fontSize: 13, color: '#aaa' }}>
           <span>WiFi速度: <b style={{ color: '#fff' }}>{downlink} Mbps</b></span>
           <span>スコア倍率: <b style={{ color: '#00aaff' }}>x{params.difficultyMultiplier.toFixed(1)}</b></span>
+          <span>波の間隔: <b style={{ color: '#fff' }}>{params.waveSpacing.toFixed(2)}</b></span>
         </div>
         {!supported && (
           <div style={{ marginTop: 8, fontSize: 12, color: '#888' }}>
