@@ -430,7 +430,7 @@ export default function HomeScreen({ onStart, wiiBoard, onBattle }) {
               <div style={s.radarCircles}></div>
             </div>
             
-            <div style={{ zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+            <div className="cyber-scroll" style={s.centerScroll}>
               <div style={s.cardTitleCenter}>// CURRENT_ENVIRONMENT</div>
               <div style={{ ...s.stageName, color: LABEL_COLOR[params.label] ?? '#00ffff', textShadow: `0 0 15px ${LABEL_COLOR[params.label] ?? '#00ffff'}` }}>
                 {params.label}
@@ -594,7 +594,19 @@ const s = {
     background: 'rgba(2, 8, 20, 0.7)', backdropFilter: 'blur(16px)', border: '1px solid rgba(0, 255, 255, 0.2)',
     borderRadius: '16px', padding: '40px', width: '100%', maxWidth: '600px',
     display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', overflow: 'hidden',
+    maxHeight: '100%', minHeight: 0,
     boxShadow: '0 0 40px rgba(0, 255, 255, 0.05), inset 0 0 30px rgba(0, 255, 255, 0.05)'
+  },
+  centerScroll: {
+    zIndex: 2,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    width: '100%',
+    overflowY: 'auto',
+    maxHeight: '100%',
+    minHeight: 0,
+    paddingRight: 8,
   },
   radarBg: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.1, pointerEvents: 'none' },
   radarCircles: { width: 300, height: 300, borderRadius: '50%', border: '1px solid #00ffff', boxShadow: 'inset 0 0 20px #00ffff, 0 0 20px #00ffff' },

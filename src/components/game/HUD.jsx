@@ -336,7 +336,7 @@ const s = {
   // コンボカウンター（左側→中央寄り）
   comboArea: {
     position: 'absolute',
-    left: '15%',
+    left: '22%',
     top: '40%',
     transform: 'translate(-50%, -50%)',
     textAlign: 'center',
