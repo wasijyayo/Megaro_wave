@@ -194,7 +194,7 @@ const WIRE_FRAG = /* glsl */`
 `;
 
 // 波のメッシュ（シェーダー版）
-const Ocean = ({ amplitude = 0.5, waveSpacing = 1.0, speed = 1.0, heightPattern = [] }: any) => {
+const Ocean = ({ amplitude = 0.5, waveSpacing = 1.0, speed = 1.0, heightPattern = [], yOffset = 0 }: any) => {
   // エイリアシング（空間解像度不足による波の逆行現象）を防ぐために十分な分割数にする
   const geometry = useMemo(() => new THREE.PlaneGeometry(30, 35, 64, 64), []);
 
@@ -249,7 +249,7 @@ const Ocean = ({ amplitude = 0.5, waveSpacing = 1.0, speed = 1.0, heightPattern 
   });
 
   return (
-    <group rotation={[-Math.PI / 2, 0, 0]}>
+    <group position={[0, yOffset, 0]} rotation={[-Math.PI / 2, 0, 0]}>
       <mesh geometry={geometry}>
         <shaderMaterial
           vertexShader={WAVE_VERT}
@@ -316,6 +316,8 @@ export default function BackgroundScene({
   personTransform?: { position?: [number, number, number]; rotation?: [number, number, number]; scale?: [number, number, number] };
   calibratedRef?: any;
 }) {
+  const OCEAN_Y_OFFSET = -1.0
+
   const params = waveParams || {
     // デフォルトの波のパラメータ
     amplitude: 0.8,     // 波の高さ
@@ -346,7 +348,7 @@ export default function BackgroundScene({
       <Environment preset="night" />
 
       {/* 海面 */}
-      <Ocean {...params} />
+      <Ocean {...params} yOffset={OCEAN_Y_OFFSET} />
 
       {personCanvas && (
         <PersonPlane
