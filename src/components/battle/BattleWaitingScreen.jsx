@@ -39,14 +39,13 @@ export default function BattleWaitingScreen({ roomName, isHost, liveKit, onGameS
 
   const { connected, remoteParticipant, remoteVideoTrack, connect, publishCamera, sendMessage } = liveKit
 
-  // マウント時に接続・カメラ公開（切断は BattleSession が管理）
+  // マウント時に接続（カメラ公開はゲーム開始時に送信側で行う）
   useEffect(() => {
     let cancelled = false
     async function init() {
       try {
         await connect(roomName)
         if (cancelled) return
-        await publishCamera()
         setStatus('waiting')
       } catch (e) {
         if (!cancelled) setError('接続に失敗しました: ' + e.message)

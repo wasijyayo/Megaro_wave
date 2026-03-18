@@ -287,7 +287,7 @@ function checkPose(poseId, lm) {
 }
 
 // ─────────────────────────────────────────────────────────
-export default function GameScene({ playerName, onGameOver, wiiBoard, waveParamsOverride, onScoreChange, selectedWifi }) {
+export default function GameScene({ playerName, onGameOver, wiiBoard, waveParamsOverride, onScoreChange, selectedWifi, publishCamera = null, remoteVideoTrack = null }) {
   const elapsedTimeRef = useRef(0);
 
   // ── hooks ──
@@ -344,7 +344,9 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
         raf = requestAnimationFrame(loop);
         return;
       }
-      ctx.clearRect(0, 0, combinedCanvas.width, combinedCanvas.height);
+      // 背景を明るい緑に塗りつぶす（クロマキー素材）
+      ctx.fillStyle = '#00FF00'
+      ctx.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
       // セグメント映像を下地に描画
       ctx.drawImage(
         segCanvas,
@@ -367,6 +369,35 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
     loop();
     return () => cancelAnimationFrame(raf);
   }, [segCanvas, poseCanvas, combinedCanvas]);
+
+  // combinedCanvas をキャプチャして LiveKit に渡す（15fps）
+  useEffect(() => {
+    if (!publishCamera || !combinedCanvas) return
+    let stopped = false
+    let localTrack = null
+
+    const startPublish = async () => {
+      try {
+        const stream = combinedCanvas.captureStream(15)
+        const track = stream.getVideoTracks()[0]
+        if (!track) return
+        localTrack = track
+        // publishCamera は二重公開防止を内部で行う
+        await publishCamera(track)
+      } catch (e) {
+        console.warn('failed to publish processed camera track', e)
+      }
+    }
+
+    startPublish()
+
+    return () => {
+      stopped = true
+      if (localTrack) {
+        try { localTrack.stop() } catch (e) { /* ignore */ }
+      }
+    }
+  }, [combinedCanvas, publishCamera])
 
   // ── UI state ──
 
@@ -613,6 +644,7 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
         onElapsedTime={(t) => {
           elapsedTimeRef.current = t;
         }}
+        remoteVideoTrack={remoteVideoTrack}
       />
 
       {/* レイヤー: HUD */}

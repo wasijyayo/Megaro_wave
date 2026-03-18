@@ -151,6 +151,7 @@ export default function BattleSession({ wiiBoard, onExit }) {
         wifiLabel={wifiLabel}
         sendMessage={liveKit.sendMessage}
         remoteVideoTrack={liveKit.remoteVideoTrack}
+        publishCamera={liveKit.publishCamera}
         opponentScore={opponentScore}
         onGameOver={handleGameOver}
       />

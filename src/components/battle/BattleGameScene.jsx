@@ -30,6 +30,7 @@ export default function BattleGameScene({
   remoteVideoTrack,
   opponentScore,
   onGameOver,
+  publishCamera,
 }) {
   const myScoreRef = useRef(0)
 
@@ -60,6 +61,8 @@ export default function BattleGameScene({
         waveParamsOverride={waveParamsOverride}
         onGameOver={handleGameOver}
         onScoreChange={handleScoreChange}
+        publishCamera={publishCamera}
+        remoteVideoTrack={remoteVideoTrack}
       />
 
       {/* 相手の映像 + スコア */}

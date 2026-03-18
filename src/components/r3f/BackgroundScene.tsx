@@ -4,6 +4,7 @@ import { Environment } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import PersonPlane from './PersonPlane'
+import RemoteHologram from '../RemoteHologram.jsx'
 import { getWaveHeight } from '../../utils/waveParams'
 
 // --- サイバー空間風のパーティクル ---
@@ -313,6 +314,7 @@ export default function BackgroundScene({
 }: {
   waveParams?: { amplitude?: number; frequency?: number; speed?: number; heightPattern?: number[] };
   personCanvas?: HTMLCanvasElement;
+  remoteVideoTrack?: any;
   personTransform?: { position?: [number, number, number]; rotation?: [number, number, number]; scale?: [number, number, number] };
   calibratedRef?: any;
 }) {
@@ -361,6 +363,14 @@ export default function BackgroundScene({
           heightOffset={2}
           calibratedRef={calibratedRef}
         />
+      )}
+
+      {/* リモート映像（グリーンバックを透過するホログラム） */}
+      {typeof (remoteVideoTrack) !== 'undefined' && remoteVideoTrack && (
+        // Lazy load component to avoid TSX import issues with JSX/JS interop
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        <RemoteHologram videoTrack={remoteVideoTrack} position={[ -2.0, 1.6, 0.6 ]} scale={[1.6, 2.4, 1]} />
       )}
 
       {/* 追加のサンプルトラッカー（残すか削除するかは任意） */}
