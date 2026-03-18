@@ -11,6 +11,28 @@ const WASM_URL =
 const MODEL_URL =
   'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite'
 
+function getCenterCropRect(sourceWidth: number, sourceHeight: number, targetWidth: number, targetHeight: number) {
+  const sourceRatio = sourceWidth / sourceHeight
+  const targetRatio = targetWidth / targetHeight
+
+  let sx = 0
+  let sy = 0
+  let sW = sourceWidth
+  let sH = sourceHeight
+
+  if (sourceRatio > targetRatio) {
+    sH = sourceHeight
+    sW = sH * targetRatio
+    sx = (sourceWidth - sW) / 2
+  } else {
+    sW = sourceWidth
+    sH = sW / targetRatio
+    sy = (sourceHeight - sH) / 2
+  }
+
+  return { sx, sy, sW, sH }
+}
+
 /**
  * MediaPipe で人体をセグメンテーションし、結果（背景透過）を
  * オフスクリーン canvas に毎フレーム書き込む。
@@ -74,19 +96,8 @@ export function usePersonSegmentation() {
           const ctx = canvas.getContext('2d')!
           ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-          const vRatio = video.videoWidth / video.videoHeight
-          const cRatio = canvas.width / canvas.height
-          let sx = 0, sy = 0, sW = video.videoWidth, sH = video.videoHeight
-          if (vRatio > cRatio) {
-            sH = video.videoHeight
-            sW = sH * cRatio
-            sx = (video.videoWidth - sW) / 2
-          } else {
-            sW = video.videoWidth
-            sH = sW / cRatio
-            sy = (video.videoHeight - sH) / 2
-          }
-          ctx.drawImage(video, sx, sy, sW, sH, 0, 0, canvas.width, canvas.height)
+          const crop = getCenterCropRect(video.videoWidth, video.videoHeight, canvas.width, canvas.height)
+          ctx.drawImage(video, crop.sx, crop.sy, crop.sW, crop.sH, 0, 0, canvas.width, canvas.height)
 
           segmenter!.segmentForVideo(video, performance.now(), (result: ImageSegmenterResult) => {
             const mask = result.categoryMask
@@ -108,8 +119,20 @@ export function usePersonSegmentation() {
             }
             maskCtx.putImageData(imgData, 0, 0)
 
+            const maskCrop = getCenterCropRect(maskCanvas.width, maskCanvas.height, canvas.width, canvas.height)
+
             ctx.globalCompositeOperation = 'destination-in'
-            ctx.drawImage(maskCanvas, 0, 0, canvas.width, canvas.height)
+            ctx.drawImage(
+              maskCanvas,
+              maskCrop.sx,
+              maskCrop.sy,
+              maskCrop.sW,
+              maskCrop.sH,
+              0,
+              0,
+              canvas.width,
+              canvas.height,
+            )
             ctx.globalCompositeOperation = 'source-over'
 
             mask.close()
