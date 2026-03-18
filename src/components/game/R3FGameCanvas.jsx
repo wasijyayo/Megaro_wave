@@ -62,7 +62,12 @@ export default function R3FGameCanvas({ waveParams, personCanvas, onElapsedTime,
       <CameraController />
       <ElapsedTimeReporter onElapsedTime={onElapsedTime} />
       <color attach="background" args={['#071428']} />
-      <BackgroundScene waveParams={waveParams} personCanvas={personCanvas} personTransform={PERSON_TRANSFORM} calibratedRef={calibratedRef} />
+      <BackgroundScene 
+      waveParams={waveParams}
+      personCanvas={personCanvas}
+      remoteVideoTrack={remoteVideoTrack}
+      personTransform={PERSON_TRANSFORM}
+      calibratedRef={calibratedRef} />
     </Canvas>
   )
 }
