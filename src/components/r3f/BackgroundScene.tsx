@@ -108,7 +108,7 @@ const CyberParticles = ({ speed = 1.0 }: { speed?: number }) => {
 const WAVE_VERT = /* glsl */`
   uniform float uTime;
   uniform float uAmplitude;
-  uniform float uFrequency;
+  uniform float uWaveSpacing; // 直接渡される波の谷→谷の距離
   uniform float uSpeed;
   uniform float uPattern[32]; // 波の高さを配列で管理
   uniform int   uPatternLen;
@@ -130,8 +130,11 @@ const WAVE_VERT = /* glsl */`
 
   void main() {
     vec3 pos = position;
-    float arg  = pos.x * uFrequency + uTime * uSpeed;
-    
+    // uWaveSpacing は「谷→谷の距離（波長）」を表すため、
+    // 周期 2π を与えるためには 2π / wavelength を掛ける必要がある。
+    float freq = 2.0 * 3.14159265 / max(0.001, uWaveSpacing);
+    float arg  = pos.x * freq - uTime * uSpeed;
+
     // 現在の波（1サイクル = 2π）の位相インデックス
     float cycleIndex = arg / (2.0 * 3.14159265);
     
@@ -152,7 +155,7 @@ const WAVE_VERT = /* glsl */`
     vHeight    = pos.z;
 
     // 解析法線 計算（スケールを加味した簡易な偏微分）
-    float dzdx  = uFrequency * uAmplitude * heightScale * cos(arg);
+    float dzdx  = freq * uAmplitude * heightScale * cos(arg);
     vec3  n     = normalize(vec3(-dzdx, 0.0, 1.0));
     vNormal_w   = normalize(normalMatrix * n);
 
@@ -191,9 +194,9 @@ const WIRE_FRAG = /* glsl */`
 `;
 
 // 波のメッシュ（シェーダー版）
-const Ocean = ({ amplitude = 0.5, frequency = 1.0, speed = 1.0, heightPattern = [] }: any) => {
-  // 頂点数: 33×33 = 1,089（旧 65×65 = 4,225 の約 1/4）
-  const geometry = useMemo(() => new THREE.PlaneGeometry(30, 35, 32, 32), []);
+const Ocean = ({ amplitude = 0.5, waveSpacing = 1.0, speed = 1.0, heightPattern = [] }: any) => {
+  // エイリアシング（空間解像度不足による波の逆行現象）を防ぐために十分な分割数にする
+  const geometry = useMemo(() => new THREE.PlaneGeometry(30, 35, 64, 64), []);
 
   const { patternArray, patternLen } = useMemo(() => {
     const arr = Array.isArray(heightPattern) && heightPattern.length > 0 ? heightPattern : [1];
@@ -202,43 +205,42 @@ const Ocean = ({ amplitude = 0.5, frequency = 1.0, speed = 1.0, heightPattern = 
     for (let i = 0; i < pLen; i++) {
         pArray[i] = Math.max(1, Number(arr[i]) || 1);
     }
-    console.log("=== Debug Ocean ===", { arr, patternArray: Array.from(pArray), patternLen: pLen });
     return { patternArray: pArray, patternLen: pLen };
   }, [heightPattern]);
 
   const waveUniforms = useMemo(() => ({
-    uTime:       { value: 0 },
-    uAmplitude:  { value: amplitude },
-    uFrequency:  { value: frequency },
-    uSpeed:      { value: speed },
-    uBaseColor:  { value: new THREE.Color('#0066ff') },
-    uPattern:    { value: patternArray },
-    uPatternLen: { value: patternLen },
+    uTime:        { value: 0 },
+    uAmplitude:   { value: amplitude },
+    uWaveSpacing: { value: waveSpacing },
+    uSpeed:       { value: speed },
+    uBaseColor:   { value: new THREE.Color('#0066ff') },
+    uPattern:     { value: patternArray },
+    uPatternLen:  { value: patternLen },
   }), []);
 
   const wireUniforms = useMemo(() => ({
-    uTime:       { value: 0 },
-    uAmplitude:  { value: amplitude },
-    uFrequency:  { value: frequency },
-    uSpeed:      { value: speed },
-    uPattern:    { value: patternArray },
-    uPatternLen: { value: patternLen },
+    uTime:        { value: 0 },
+    uAmplitude:   { value: amplitude },
+    uWaveSpacing: { value: waveSpacing },
+    uSpeed:       { value: speed },
+    uPattern:     { value: patternArray },
+    uPatternLen:  { value: patternLen },
   }), []);
 
   // waveParams が変わったら uniform を同期
   useEffect(() => {
-    waveUniforms.uAmplitude.value  = amplitude;
-    waveUniforms.uFrequency.value  = frequency;
-    waveUniforms.uSpeed.value      = speed;
-    waveUniforms.uPattern.value    = patternArray;
-    waveUniforms.uPatternLen.value = patternLen;
+    waveUniforms.uAmplitude.value   = amplitude;
+    waveUniforms.uWaveSpacing.value = waveSpacing;
+    waveUniforms.uSpeed.value       = speed;
+    waveUniforms.uPattern.value     = patternArray;
+    waveUniforms.uPatternLen.value  = patternLen;
 
-    wireUniforms.uAmplitude.value  = amplitude;
-    wireUniforms.uFrequency.value  = frequency;
-    wireUniforms.uSpeed.value      = speed;
-    wireUniforms.uPattern.value    = patternArray;
-    wireUniforms.uPatternLen.value = patternLen;
-  }, [amplitude, frequency, speed, patternArray, patternLen, waveUniforms, wireUniforms]);
+    wireUniforms.uAmplitude.value   = amplitude;
+    wireUniforms.uWaveSpacing.value = waveSpacing;
+    wireUniforms.uSpeed.value       = speed;
+    wireUniforms.uPattern.value     = patternArray;
+    wireUniforms.uPatternLen.value  = patternLen;
+  }, [amplitude, waveSpacing, speed, patternArray, patternLen, waveUniforms, wireUniforms]);
   // 毎フレームは uTime の float 1つだけ更新
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
@@ -316,9 +318,10 @@ export default function BackgroundScene({
 }) {
   const params = waveParams || {
     // デフォルトの波のパラメータ
-    amplitude: 0.8,// 波の高さ
-    frequency: 1.5,// 波の密度(大きいほど細かい波になる)
-    speed: 1.0,// 波の速さ
+    amplitude: 0.8,     // 波の高さ
+    frequency: 1.5,     // 波の密度(大きいほど細かい波になる)
+    waveSpacing: 1.5,   // 波の間隔（谷→谷の距離）
+    speed: 1.0,         // 波の速さ
   };
 
   return (

@@ -9,26 +9,8 @@ function clampNumber(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function normalizeDigits(values) {
-  // 後方互換で一応残すがもう呼ばれない想定（必要なら適宜削除）
-  if (Array.isArray(values)) {
-    const digits = values
-      .map((value) => Math.abs(Math.floor(clampNumber(value, 1))) % 10)
-      .map((value) => (value === 0 ? 1 : value));
-    return digits.length > 0 ? digits : [1];
-  }
-  return [1];
-}
-
-export function buildRepeatingPattern(values, length = 12) {
-  const source = normalizeDigits(values);
-  const size = Math.max(1, Math.floor(clampNumber(length, 12)));
-
-  return Array.from({ length: size }, (_, index) => source[index % source.length]);
-}
-
 export function getWaveHeightPattern(ssid, length = 12) {
-  // 元の buildRepeatingPattern ではなく、新しい同期版 SSID 画数配列をそのまま波パターンに使う
+  // 新しい同期版 SSID 画数配列をそのまま波パターンに使う
   // パターンが空の場合は最低限 [1] が返る
   return ssidToStrokeArraySync(ssid);
 }
@@ -77,30 +59,34 @@ export function getWaveParams(input) {
   const speedT = Math.min(Math.max(downlink, 0), 100) / 100;
   const strengthT = Math.min(Math.max(strength, 0), 100) / 100;
 
-  const amplitude = lerp(0.15, 1.8, speedT);
-  const frequency = lerp(1.8, 0.3, strengthT);
-  const speed = lerp(0.4, 30.0, speedT);
-  const waveSpacing = lerp(0.4, 2.2, strengthT);
+  // 全体的に波が高くなりすぎるのを抑えるため、ベースの amplitude スケーリング
+  const amplitude = lerp(0.15, 1.8, speedT) * 0.5;
+  // エイリアシングを防ぐため最低波長を0.5からに修正
+  const waveSpacing = lerp(0.5, 2.2, strengthT) * 4;
+  // waveSpacing をそのまま「波の間隔（谷-谷）として扱うため」、
+  // 周期は 2π なので frequency = 2π / waveSpacing にしています。
+  const frequency = (2.0 * Math.PI) / Math.max(0.001, waveSpacing);
+  const speed = lerp(0.4, 10.0, speedT);
   const turbulence = lerp(0.0, 1.0, speedT);
   const difficultyMultiplier = lerp(1.0, 5.0, speedT);
   const heightPattern = getWaveHeightPattern(ssid, heightPatternLength);
-  console.log("bug WaveParams ===", { ssid, heightPattern });
 
-  const label =
-    downlink < 5
-      ? "湖のように穏やか"
-      : downlink < 20
-        ? "穏やか"
-        : downlink < 50
-          ? "普通"
-          : downlink < 80
-            ? "荒れ"
-            : "嵐";
+  let label = "嵐";
+  let color = { deep: "#061d3a", surface: "#0a5570" };
 
-  const color = {
-    deep: downlink < 20 ? "#0d4f8c" : downlink < 50 ? "#0a3d6b" : "#061d3a",
-    surface: downlink < 20 ? "#1a9eba" : downlink < 50 ? "#0e7aa0" : "#0a5570",
-  };
+  if (downlink < 5) {
+    label = "湖のように穏やか";
+    color = { deep: "#0d4f8c", surface: "#1a9eba" };
+  } else if (downlink < 20) {
+    label = "穏やか";
+    color = { deep: "#0d4f8c", surface: "#1a9eba" };
+  } else if (downlink < 50) {
+    label = "普通";
+    color = { deep: "#0a3d6b", surface: "#0e7aa0" };
+  } else if (downlink < 80) {
+    label = "荒れ";
+    color = { deep: "#061d3a", surface: "#0a5570" };
+  }
 
   return {
     amplitude,
@@ -160,7 +146,7 @@ export function getWaveHeight(
     : [1];
   
   // シェーダーのロジックと完全に一致させるための位相計算
-  const arg = x * frequency + time * speed;
+  const arg = x * frequency - time * speed;
   const cycleIndex = arg / (2.0 * Math.PI);
 
   const getPatternAt = (index) => {

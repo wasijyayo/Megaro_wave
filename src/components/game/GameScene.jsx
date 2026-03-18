@@ -11,9 +11,9 @@ import { ssidToStrokeArray } from "../../utils/strokeCount.js";
 import { playSuccessChime } from "../../utils/poseClearSounds.js";
 
 // ── 定数 ──────────────────────────────────────────────────
-const TOTAL_LIVES = 3;
-const BALANCE_TOLERANCE = 1.28; // CoP と目標傾きの許容差 (-1〜1)
-const IMBALANCE_TIMEOUT = 2000; // ms: この時間超えるとライフ -1
+const TOTAL_LIVES = 100;
+const BALANCE_TOLERANCE = 0.28; // CoP と目標傾きの許容差 (-1〜1)
+const IMBALANCE_TIMEOUT = 20; // ms: この時間超えるとライフ -1
 const COMBO_TIMEOUT = 4000; // ms: コンボが切れるまでの時間
 // ── ポーズ定義 ──────────────────────────────────────────
 const POSE_LIST = [
@@ -518,6 +518,7 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
       <HUD
         score={score}
         lives={lives}
+        maxLives={TOTAL_LIVES}
         balance={balance}
         balanceRef={balanceRef}
         waveLabel={effectiveWaveParams.label}
