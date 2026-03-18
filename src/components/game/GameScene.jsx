@@ -444,6 +444,7 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
       <R3FGameCanvas
         waveParams={getWaveParams(downlink)}
         personCanvas={combinedCanvas}
+        calibratedRef={copRef}
         onElapsedTime={(t) => {
           elapsedTimeRef.current = t;
         }}
