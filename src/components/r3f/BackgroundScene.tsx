@@ -309,6 +309,7 @@ const Tracker = ({ targetX, amplitude = 0.5, frequency = 1.0, speed = 1.0, heigh
 export default function BackgroundScene({
   waveParams,
   personCanvas,
+  remoteVideoTrack,
   personTransform,
   calibratedRef,
 }: {
