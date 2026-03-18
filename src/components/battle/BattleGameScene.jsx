@@ -85,7 +85,7 @@ export default function BattleGameScene({
 const s = {
   opponentPanel: {
     position: 'absolute',
-    top: 80,
+    top: 180,
     left: 16,
     width: 160,
     background: 'rgba(4,12,26,0.8)',
