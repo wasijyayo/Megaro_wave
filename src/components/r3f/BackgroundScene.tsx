@@ -226,9 +226,10 @@ type TrackerProps = {
   amplitude?: number;
   frequency?: number;
   speed?: number;
+  heightPattern?: number[];
 };
 
-const Tracker = ({ targetX, amplitude = 0.5, frequency = 1.0, speed = 1.0 }: TrackerProps) => {
+const Tracker = ({ targetX, amplitude = 0.5, frequency = 1.0, speed = 1.0, heightPattern = [] }: TrackerProps) => {
   const sphereRef = useRef<THREE.Mesh | null>(null);
   const radius = 0.22; // 球の半径と同程度のオフセットを適用して埋まりを防止
 
@@ -236,7 +237,7 @@ const Tracker = ({ targetX, amplitude = 0.5, frequency = 1.0, speed = 1.0 }: Tra
     const time = state.clock.getElapsedTime();
     // ここで動的に指定座標(targetX, targetZ)の波の高さを取得
     // (targetZ を廃止したため Z=0を使う)
-    const currentY = getWaveHeight(targetX, 0, time, amplitude, frequency, speed);
+    const currentY = getWaveHeight(targetX, 0, time, amplitude, frequency, speed, heightPattern);
     
     if (sphereRef.current) {
       // 波面に完全に埋まらないように、球の半径分だけ少し浮かせる
@@ -258,7 +259,7 @@ export default function BackgroundScene({
   personTransform,
   calibratedRef,
 }: {
-  waveParams?: { amplitude?: number; frequency?: number; speed?: number };
+  waveParams?: { amplitude?: number; frequency?: number; speed?: number; heightPattern?: number[] };
   personCanvas?: HTMLCanvasElement;
   personTransform?: { position?: [number, number, number]; rotation?: [number, number, number]; scale?: [number, number, number] };
   calibratedRef?: any;

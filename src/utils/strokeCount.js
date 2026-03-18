@@ -94,9 +94,35 @@ async function getCharStrokes(char) {
   return 1
 }
 
-// ── SSID 全体の画数合計を返す ───────────────────────────
-export async function ssidToStrokeTotal(ssid) {
-  if (!ssid) return 0
+// ── 1文字の画数を返す(同期版。キャッシュかデフォルト1) ──────────────────────
+export function getCharStrokesSync(char) {
+  if (HIRAGANA[char] !== undefined) return HIRAGANA[char]
+  if (KATAKANA[char] !== undefined) return KATAKANA[char]
+  if (NUMBERS[char]  !== undefined) return NUMBERS[char]
+  if (ALPHA[char]    !== undefined) return ALPHA[char]
+  // APIキャッシュ済みなら返す
+  if (kanjiCache[char] !== undefined) return kanjiCache[char]
+  // それ以外（未キャッシュの漢字や記号）は一旦1とみなす
+  return 1
+}
+
+export function ssidToStrokeArraySync(ssid) {
+  if (!ssid) return [1]
+  const arr = [...ssid].map(getCharStrokesSync)
+  return arr.length > 0 ? arr : [1]
+}
+
+// ── SSID 全体の画数合計を返す（非同期・オリジナル） ───────────────────────────
+export async function ssidToStrokeArray(ssid) {
+  // SSID を一文字ずつ処理して各文字の画数を配列で返す
+  if (!ssid) return []
   const strokes = await Promise.all([...ssid].map(getCharStrokes))
+  return strokes
+}
+
+export async function ssidToStrokeTotal(ssid) {
+  // 互換性のため既存の合計関数は維持（内部で配列関数を利用）
+  if (!ssid) return 0
+  const strokes = await ssidToStrokeArray(ssid)
   return strokes.reduce((sum, s) => sum + s, 0)
 }

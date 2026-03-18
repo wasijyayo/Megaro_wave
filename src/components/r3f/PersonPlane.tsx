@@ -19,7 +19,7 @@ interface PersonPlaneProps {
   scale?: [number, number, number]
   // 波に追従させるオプション
   followWave?: boolean
-  waveParams?: { amplitude?: number; frequency?: number; speed?: number; turbulence?: number }
+  waveParams?: { amplitude?: number; frequency?: number; speed?: number; turbulence?: number; heightPattern?: number[] }
   heightOffset?: number
   // サーフボード関連
   enableSurfboard?: boolean
@@ -82,8 +82,8 @@ export default function PersonPlane({
       // ワールド座標を計算 (グループ位置 + メッシュ相対位置)
       const worldX = groupRef.current.position.x
       const worldZ = groupRef.current.position.z
-      const { amplitude = 0.5, frequency = 1.0, speed = 1.0, turbulence = 0 } = waveParams || {}
-      const y = getWaveHeight(worldX, worldZ, time, amplitude, frequency, speed)
+      const { amplitude = 0.5, frequency = 1.0, speed = 1.0, turbulence = 0, heightPattern = [] } = waveParams || {}
+      const y = getWaveHeight(worldX, worldZ, time, amplitude, frequency, speed, heightPattern)
       // 波に追従した高さをグループに適用
       if (followWave) groupRef.current.position.y = y + heightOffset
 

@@ -476,7 +476,9 @@ export default function HomeScreen({ onStart, wiiBoard, onBattle }) {
   }, [])
 
   const effectiveDownlink = selectedWifi ? selectedWifi.fast : downlink
-  const params = getWaveParams(effectiveDownlink)
+  const params = selectedWifi
+    ? getWaveParams({ downlink: effectiveDownlink, strength: effectiveDownlink, ssid: selectedWifi.ssid })
+    : getWaveParams(effectiveDownlink)
   const isStorm = params.label === '嵐'
   const lightningShow = useLightning(isStorm)
 
@@ -553,6 +555,12 @@ export default function HomeScreen({ onStart, wiiBoard, onBattle }) {
               <span style={s.infoKey}>スコア倍率</span>
               <span style={{ ...s.infoVal, color: '#00aaff' }}>
                 x{params.difficultyMultiplier.toFixed(1)}
+              </span>
+              <span style={s.infoKey}>波の間隔</span>
+              <span style={s.infoVal}>{params.waveSpacing.toFixed(2)}</span>
+              <span style={s.infoKey}>波の高さ</span>
+              <span style={s.infoVal}>
+                [{params.heightPattern.slice(0, 6).join(', ')}{params.heightPattern.length > 6 ? ', …' : ''}]
               </span>
             </div>
           </div>

@@ -31,7 +31,7 @@ export default function WifiSelectModal({ onSelect, onClose }) {
 
   const filtered = filter === 'すべて'
     ? wifiList
-    : wifiList.filter(w => getWaveParams(w.fast).label === filter)
+    : wifiList.filter(w => getWaveParams({ downlink: w.fast, strength: w.fast, ssid: w.ssid }).label === filter)
 
   return (
     <div style={s.overlay} onClick={onClose}>
@@ -72,6 +72,7 @@ export default function WifiSelectModal({ onSelect, onClose }) {
             <span style={s.colCell}>難易度</span>
             <span style={s.colCell}>通信速度</span>
             <span style={s.colCell}>得点倍率</span>
+            <span style={s.colCell}>波の高さ</span>
           </div>
 
           {loading && (
@@ -85,7 +86,7 @@ export default function WifiSelectModal({ onSelect, onClose }) {
             </div>
           )}
           {!loading && filtered.map(wifi => {
-            const params = getWaveParams(wifi.fast)
+            const params = getWaveParams({ downlink: wifi.fast, strength: wifi.fast, ssid: wifi.ssid })
             return (
               <div
                 key={wifi.ssid}
@@ -109,6 +110,9 @@ export default function WifiSelectModal({ onSelect, onClose }) {
                 </span>
                 <span style={{ ...s.cell, color: '#1a4fc4', fontWeight: 700 }}>
                   x{params.difficultyMultiplier.toFixed(1)}倍
+                </span>
+                <span style={{ ...s.cell, color: '#555', fontSize: 11 }}>
+                  [{params.heightPattern.slice(0, 4).join(', ')}{params.heightPattern.length > 4 ? ', …' : ''}]
                 </span>
               </div>
             )
