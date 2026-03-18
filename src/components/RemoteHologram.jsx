@@ -1,6 +1,5 @@
 import React, { useMemo, useEffect } from 'react'
 import * as THREE from 'three'
-import { useVideoTexture } from '@react-three/drei'
 
 export default function RemoteHologram({ videoTrack, position = [2, 1.6, 0.5], scale = [1.6, 2.4, 1] }) {
   const videoEl = useMemo(() => {
@@ -22,7 +21,16 @@ export default function RemoteHologram({ videoTrack, position = [2, 1.6, 0.5], s
     }
   }, [videoTrack, videoEl])
 
-  const texture = useVideoTexture(videoEl)
+  const texture = useMemo(() => {
+    if (!videoEl) return null
+    const tex = new THREE.VideoTexture(videoEl)
+    // 色空間の扱いはthreeのバージョンでプロパティ名が異なるため両方試す
+    try { tex.colorSpace = THREE.SRGBColorSpace } catch (e) { tex.encoding = THREE.sRGBEncoding }
+    tex.minFilter = THREE.LinearFilter
+    tex.magFilter = THREE.LinearFilter
+    tex.needsUpdate = true
+    return tex
+  }, [videoEl])
   if (!texture) return null
 
   const keyColor = new THREE.Color(0x00ff00)
@@ -70,3 +78,4 @@ export default function RemoteHologram({ videoTrack, position = [2, 1.6, 0.5], s
     </mesh>
   )
 }
+
