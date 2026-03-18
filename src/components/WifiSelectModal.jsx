@@ -7,11 +7,11 @@ import { UserContext } from '../contexts/UserContext.js'
 const DIFFICULTY_OPTIONS = ['すべて', '湖のように穏やか', '穏やか', '普通', '荒れ', '嵐']
 
 const LABEL_COLOR = {
-  '湖のように穏やか': '#4fc3f7',
-  '穏やか':           '#81d4fa',
-  '普通':             '#a5d6a7',
-  '荒れ':             '#ffb74d',
-  '嵐':               '#ef5350',
+  '湖のように穏やか': '#00e5ff',
+  '穏やか':           '#40c4ff',
+  '普通':             '#69f0ae',
+  '荒れ':             '#ffab40',
+  '嵐':               '#ff5252',
 }
 
 export default function WifiSelectModal({ onSelect, onClose }) {
@@ -39,12 +39,23 @@ export default function WifiSelectModal({ onSelect, onClose }) {
 
         {/* ヘッダー */}
         <div style={s.header}>
-          <span style={s.title}>Wifi選択</span>
+          <span style={s.title}>WIFI NETWORKS DETECTED</span>
           <div style={s.headerRight}>
             {/* 難易度フィルター */}
             <div style={{ position: 'relative' }}>
-              <button style={s.filterBtn} onClick={() => setShowFilter(v => !v)}>
-                難易度 {filter !== 'すべて' ? `(${filter})` : ''} ▾
+              <button 
+                style={s.filterBtn} 
+                onClick={() => setShowFilter(v => !v)}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'rgba(0, 255, 255, 0.2)'
+                  e.currentTarget.style.boxShadow = '0 0 8px rgba(0, 255, 255, 0.6)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'rgba(0, 255, 255, 0.05)'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              >
+                LEVEL {filter !== 'すべて' ? `(${filter})` : ''} ▾
               </button>
               {showFilter && (
                 <div style={s.dropdown}>
@@ -53,6 +64,12 @@ export default function WifiSelectModal({ onSelect, onClose }) {
                       key={opt}
                       style={{ ...s.dropdownItem, ...(filter === opt ? s.dropdownItemActive : {}) }}
                       onClick={() => { setFilter(opt); setShowFilter(false) }}
+                      onMouseEnter={e => {
+                        if (filter !== opt) e.currentTarget.style.background = 'rgba(0, 255, 255, 0.15)'
+                      }}
+                      onMouseLeave={e => {
+                        if (filter !== opt) e.currentTarget.style.background = 'transparent'
+                      }}
                     >
                       {opt}
                     </div>
@@ -60,7 +77,22 @@ export default function WifiSelectModal({ onSelect, onClose }) {
                 </div>
               )}
             </div>
-            <button style={s.closeBtn} onClick={onClose}>✕</button>
+            <button 
+              style={s.closeBtn} 
+              onClick={onClose}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'rgba(255, 0, 43, 0.2)'
+                e.currentTarget.style.color = '#ff1744'
+                e.currentTarget.style.borderColor = '#ff1744'
+                e.currentTarget.style.boxShadow = '0 0 8px rgba(255, 0, 43, 0.6)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'rgba(0, 255, 255, 0.05)'
+                e.currentTarget.style.color = '#00ffff'
+                e.currentTarget.style.borderColor = 'rgba(0, 255, 255, 0.4)'
+                e.currentTarget.style.boxShadow = 'none'
+              }}
+            >✕</button>
           </div>
         </div>
 
@@ -69,24 +101,25 @@ export default function WifiSelectModal({ onSelect, onClose }) {
           {/* カラム見出し */}
           <div style={s.colRow}>
             <span style={{ ...s.colCell, flex: 2 }}>SSID</span>
-            <span style={s.colCell}>難易度</span>
-            <span style={s.colCell}>通信速度</span>
-            <span style={s.colCell}>得点倍率</span>
-            <span style={s.colCell}>波の高さ</span>
+            <span style={s.colCell}>DIFFICULTY</span>
+            <span style={s.colCell}>SPEED</span>
+            <span style={s.colCell}>MULTIPLIER</span>
+            <span style={s.colCell}>WAVE PATTERN</span>
           </div>
 
           {loading && (
-            <div style={s.empty}>読み込み中...</div>
+            <div style={s.empty}>SCANNING NETWORKS...</div>
           )}
           {!loading && filtered.length === 0 && (
             <div style={s.empty}>
               {wifiList.length === 0
-                ? 'Firebase に保存済みWiFiがありません'
-                : '該当するWiFiがありません'}
+                ? 'NO SAVED NETWORKS FOUND IN FIREBASE'
+                : 'NO NETWORKS MATCH THE CURRENT FILTER'}
             </div>
           )}
           {!loading && filtered.map(wifi => {
             const params = getWaveParams({ downlink: wifi.fast, strength: wifi.fast, ssid: wifi.ssid })
+            const labelColor = LABEL_COLOR[params.label] ?? '#00ffff'
             return (
               <div
                 key={wifi.ssid}
@@ -96,29 +129,36 @@ export default function WifiSelectModal({ onSelect, onClose }) {
                   onSelect({ ...wifi, strokeTotal })
                   onClose()
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = '#e0e0e0'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'rgba(0, 255, 255, 0.15)'
+                  e.currentTarget.style.boxShadow = 'inset 0 0 15px rgba(0, 255, 255, 0.2)'
+                  e.currentTarget.style.borderColor = '#00ffff'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.boxShadow = 'none'
+                  e.currentTarget.style.borderColor = 'rgba(0, 255, 255, 0.2)'
+                }}
               >
-                <span style={{ ...s.cell, flex: 2, fontWeight: 600, color: '#111' }}>
+                <span style={{ ...s.cell, flex: 2, fontWeight: 700, color: '#fff', textShadow: '0 0 4px rgba(255,255,255,0.5)' }}>
                   {wifi.ssid}
                 </span>
-                <span style={{ ...s.cell, color: LABEL_COLOR[params.label] ?? '#333', fontWeight: 700 }}>
+                <span style={{ ...s.cell, color: labelColor, fontWeight: 700, textShadow: `0 0 8px ${labelColor}` }}>
                   {params.label}
                 </span>
-                <span style={{ ...s.cell, color: '#333' }}>
+                <span style={{ ...s.cellNum, color: '#e0e0e0' }}>
                   {wifi.fast} Mbps
                 </span>
-                <span style={{ ...s.cell, color: '#1a4fc4', fontWeight: 700 }}>
+                <span style={{ ...s.cellNum, color: '#00ffff', fontWeight: 700, textShadow: '0 0 5px rgba(0, 255, 255, 0.8)' }}>
                   x{params.difficultyMultiplier.toFixed(1)}倍
                 </span>
-                <span style={{ ...s.cell, color: '#555', fontSize: 11 }}>
+                <span style={{ ...s.cellNum, color: '#888' }}>
                   [{params.heightPattern.slice(0, 4).join(', ')}{params.heightPattern.length > 4 ? ', …' : ''}]
                 </span>
               </div>
             )
           })}
         </div>
-
       </div>
     </div>
   )
@@ -127,66 +167,93 @@ export default function WifiSelectModal({ onSelect, onClose }) {
 const s = {
   overlay: {
     position: 'fixed', inset: 0,
-    background: 'rgba(0,0,0,0.5)',
+    background: 'rgba(0, 0, 0, 0.7)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     zIndex: 1000,
   },
   modal: {
-    background: '#d0d0d0',
-    borderRadius: 8,
-    width: '60%', maxWidth: 720, minWidth: 460,
+    background: 'rgba(6, 17, 33, 0.85)',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
+    border: '1px solid rgba(0, 255, 255, 0.4)',
+    borderRadius: 4,
+    width: '70%', maxWidth: 860, minWidth: 500,
     maxHeight: '80vh',
     display: 'flex', flexDirection: 'column',
     overflow: 'hidden',
-    boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
+    boxShadow: '0 0 30px rgba(0, 255, 255, 0.15), inset 0 0 20px rgba(0, 255, 255, 0.05)',
+    color: '#fff',
   },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     padding: '16px 20px',
-    borderBottom: '1px solid #bbb',
-    background: '#c8c8c8',
+    borderBottom: '1px solid rgba(0, 255, 255, 0.5)',
+    background: 'linear-gradient(90deg, rgba(0, 255, 255, 0.1) 0%, rgba(6, 17, 33, 0) 100%)',
   },
-  title:     { fontSize: 18, fontWeight: 800, color: '#111' },
-  headerRight: { display: 'flex', alignItems: 'center', gap: 10 },
+  title: { 
+    fontSize: 20, fontWeight: 900, color: '#00ffff',
+    letterSpacing: '0.1em',
+    textShadow: '0 0 10px rgba(0, 255, 255, 0.8), 0 0 20px rgba(0, 255, 255, 0.4)'
+  },
+  headerRight: { display: 'flex', alignItems: 'center', gap: 12 },
   filterBtn: {
-    padding: '6px 14px', borderRadius: 6,
-    border: '1px solid #999', background: '#eee',
-    cursor: 'pointer', fontSize: 12, color: '#333',
+    padding: '6px 14px', borderRadius: 4,
+    border: '1px solid rgba(0, 255, 255, 0.4)', background: 'rgba(0, 255, 255, 0.05)',
+    cursor: 'pointer', fontSize: 12, color: '#00ffff', fontWeight: 600,
+    letterSpacing: '0.05em', transition: 'all 0.2s',
   },
   dropdown: {
-    position: 'absolute', right: 0, top: 34, zIndex: 10,
-    background: '#eee', border: '1px solid #bbb',
-    borderRadius: 6, minWidth: 150,
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    position: 'absolute', right: 0, top: 40, zIndex: 10,
+    background: 'rgba(6, 17, 33, 0.95)', border: '1px solid #00ffff',
+    borderRadius: 4, minWidth: 160,
+    boxShadow: '0 0 15px rgba(0, 255, 255, 0.3)',
+    backdropFilter: 'blur(4px)',
   },
   dropdownItem: {
-    padding: '8px 14px', fontSize: 13, color: '#333', cursor: 'pointer',
+    padding: '10px 14px', fontSize: 13, color: '#00ffff', cursor: 'pointer',
+    transition: 'background 0.2s', borderBottom: '1px solid rgba(0, 255, 255, 0.1)'
   },
-  dropdownItemActive: { background: '#d0d0d0', fontWeight: 700 },
+  dropdownItemActive: { 
+    background: 'rgba(0, 255, 255, 0.25)', 
+    fontWeight: 700,
+    textShadow: '0 0 8px rgba(0, 255, 255, 0.8)',
+  },
   closeBtn: {
     padding: '4px 10px', borderRadius: 4,
-    border: 'none', background: '#aaa',
-    cursor: 'pointer', fontSize: 14, color: '#333',
+    border: '1px solid rgba(0, 255, 255, 0.4)', background: 'rgba(0, 255, 255, 0.05)',
+    cursor: 'pointer', fontSize: 14, color: '#00ffff', transition: 'all 0.2s',
   },
   tableWrap: {
     flex: 1, overflowY: 'auto',
-    padding: '8px 0',
+    padding: '0 0 10px 0',
   },
   colRow: {
-    display: 'flex', padding: '6px 20px',
-    borderBottom: '1px solid #bbb',
-    background: '#c0c0c0',
+    display: 'flex', padding: '10px 20px',
+    borderBottom: '1px solid rgba(0, 255, 255, 0.4)',
+    background: 'rgba(0, 255, 255, 0.08)',
   },
   colCell: {
-    flex: 1, fontSize: 12, fontWeight: 700,
-    color: '#555', letterSpacing: '0.05em', textTransform: 'uppercase',
+    flex: 1, fontSize: 11, fontWeight: 800,
+    color: '#00ffff', letterSpacing: '0.1em', textTransform: 'uppercase',
+    textShadow: '0 0 5px rgba(0, 255, 255, 0.5)'
   },
   row: {
-    display: 'flex', padding: '12px 20px',
-    borderBottom: '1px solid #bbb',
-    cursor: 'pointer', transition: 'background 0.1s',
+    display: 'flex', padding: '14px 20px',
+    borderBottom: '1px solid rgba(0, 255, 255, 0.2)',
+    cursor: 'pointer', transition: 'all 0.15s ease',
     alignItems: 'center',
   },
-  cell: { flex: 1, fontSize: 13 },
-  empty: { padding: '24px 20px', color: '#666', fontSize: 13, textAlign: 'center' },
+  cell: { 
+    flex: 1, fontSize: 14, letterSpacing: '0.03em'
+  },
+  cellNum: {
+    flex: 1, fontSize: 14, 
+    fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+    fontVariantNumeric: 'tabular-nums', letterSpacing: '0.05em'
+  },
+  empty: { 
+    padding: '40px 20px', color: '#00ffff', fontSize: 14, 
+    textAlign: 'center', letterSpacing: '0.1em',
+    textShadow: '0 0 8px rgba(0, 255, 255, 0.5)'
+  },
 }

@@ -26,7 +26,7 @@ export default function HUD({
               style={{
                 position: 'absolute', left: 0, top: 0, bottom: 0,
                 width: `${Math.min(Math.max(lives / (maxLives || 1), 0), 1) * 100}%`,
-                background: 'linear-gradient(90deg, #ff4444, #ffaa33, #44ff88 )',
+                background: 'linear-gradient(90deg, #ff4444, #ffaa33, #00ff88 )',
                 transition: 'width 280ms linear',
                 boxShadow: '0 0 8px rgba(255,68,0,0.18) inset'
               }}
@@ -41,14 +41,14 @@ export default function HUD({
       {/* 中央上: ステージ名 */}
       <div style={{ position: 'absolute', top: 18, left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
         <div style={s.label}>STAGE</div>
-        <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginTop: 2 }}>{waveLabel}</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', textShadow: '0 0 10px #00ffff', marginTop: 2 }}>{waveLabel}</div>
       </div>
 
       {/* 右上: スコア + 目標ポーズ */}
       <div style={{ position: 'absolute', top: 18, right: 20, width: 200 }}>
         <div style={{ textAlign: 'right' }}>
         <div style={s.label}>SCORE</div>
-        <div style={{ fontSize: 34, fontWeight: 900, color: '#fff', lineHeight: 1, textShadow: '0 0 18px #00aaff' }}>
+        <div style={{ fontSize: 34, fontWeight: 900, color: '#fff', textShadow: '0 0 10px #00ffff', lineHeight: 1, textShadow: '0 0 18px #00aaff' }}>
           {score.toLocaleString()}
         </div>
         <div style={{ fontSize: 12, color: '#00aaff', marginTop: 2 }}>
@@ -62,17 +62,17 @@ export default function HUD({
             padding: '10px 12px',
             borderRadius: 12,
             background: targetPoseActive ? 'rgba(68,255,136,0.22)' : 'rgba(0,0,0,0.5)',
-            border: `1px solid ${targetPoseActive ? '#44ff88' : 'rgba(255,255,255,0.14)'}`,
+            border: `1px solid ${targetPoseActive ? '#00ff88' : 'rgba(255,255,255,0.14)'}`,
             boxShadow: targetPoseActive ? '0 0 18px rgba(68,255,136,0.35)' : 'none',
           }}>
             <div style={{ ...s.label, textAlign: 'left' }}>TARGET POSE</div>
             <div style={{ marginTop: 8, display: 'flex', justifyContent: 'center' }}>
               <TargetPosePreview poseId={targetPose.id} active={targetPoseActive} />
             </div>
-            <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: '#fff', textAlign: 'center' }}>
+            <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: '#fff', textShadow: '0 0 10px #00ffff', textAlign: 'center' }}>
               {targetPose.label}
             </div>
-            <div style={{ marginTop: 4, fontSize: 12, color: targetPoseActive ? '#44ff88' : '#8bdcff', textAlign: 'center' }}>
+            <div style={{ marginTop: 4, fontSize: 12, color: targetPoseActive ? '#00ff88' : '#8bdcff', textAlign: 'center' }}>
               成功で +{targetPose.points.toLocaleString()}
             </div>
           </div>
@@ -152,7 +152,7 @@ function ComboBar({ combo, comboExpiryTime, comboDuration }) {
 }
 
 function TargetPosePreview({ poseId, active }) {
-  const stroke = active ? '#44ff88' : '#8bdcff'
+  const stroke = active ? '#00ff88' : '#8bdcff'
 
   // 共通パーツ: 頭・首・肩ライン・脇腹(台形)・腰ライン・脚(膝関節付き)
   const head = <circle cx="48" cy="14" r="9" fill="none" stroke={stroke} strokeWidth="4" />
@@ -282,7 +282,7 @@ function BalanceMeter({ balanceRef }) {
       const displayX     = Number.isFinite(calibratedX) ? calibratedX : copX
       const indicatorPct = Math.min(Math.max((displayX + 1) / 2, 0), 1) * 100
       const targetPct    = Math.min(Math.max((targetX  + 1) / 2, 0), 1) * 100
-      const color        = ok ? '#44ff88' : '#ff4444'
+      const color        = ok ? '#00ff88' : '#ff4444'
 
       if (indicatorRef.current) {
         indicatorRef.current.style.left       = `${indicatorPct}%`
@@ -298,13 +298,13 @@ function BalanceMeter({ balanceRef }) {
   }, [balanceRef])
 
   return (
-    <div ref={trackRef} style={{ position: 'relative', height: 18, background: '#111', borderRadius: 9, border: '2px solid #44ff88', overflow: 'hidden' }}>
+    <div ref={trackRef} style={{ position: 'relative', height: 18, background: '#111', borderRadius: 9, border: '2px solid #00ff88', overflow: 'hidden' }}>
       {/* 許容ゾーン */}
       <div ref={zoneRef} style={{ position: 'absolute', top: 0, bottom: 0, left: '38%', width: '24%', background: 'rgba(68,255,136,0.15)' }} />
       {/* 目標ライン */}
-      <div ref={targetLineRef} style={{ position: 'absolute', top: 0, bottom: 0, left: '50%', width: 2, background: '#44ff88', opacity: 0.8 }} />
+      <div ref={targetLineRef} style={{ position: 'absolute', top: 0, bottom: 0, left: '50%', width: 2, background: '#00ff88', opacity: 0.8 }} />
       {/* 現在の重心 — transition なし、RAFで直接更新 */}
-      <div ref={indicatorRef} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 14, height: 14, borderRadius: '50%', background: '#44ff88', boxShadow: '0 0 8px #44ff88' }} />
+      <div ref={indicatorRef} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 14, height: 14, borderRadius: '50%', background: '#00ff88', boxShadow: '0 0 8px #00ff88' }} />
     </div>
   )
 }
@@ -313,13 +313,13 @@ const s = {
   root: {
     position: 'absolute', inset: 0,
     pointerEvents: 'none',
-    fontFamily: 'system-ui, sans-serif',
-    color: '#fff',
+    fontFamily: 'ui-monospace, Consolas, monospace',
+    color: '#fff', textShadow: '0 0 10px #00ffff',
   },
   label: {
     fontSize: 11,
     letterSpacing: '0.08em',
-    color: '#888',
+    color: '#7aadff',
     textTransform: 'uppercase',
   },
   actionPopup: {
@@ -328,8 +328,8 @@ const s = {
     transform: 'translateX(-50%)',
     textAlign: 'center',
     fontSize: 30, fontWeight: 900,
-    color: '#ffee00',
-    textShadow: '0 0 24px #ffee00',
+    color: '#00ffff',
+    textShadow: '0 0 24px #00ffff',
     animation: 'popupFade 1s forwards',
     pointerEvents: 'none',
   },
@@ -345,14 +345,14 @@ const s = {
   comboNumber: {
     fontSize: 52,
     fontWeight: 900,
-    color: '#ff6600',
-    textShadow: '0 0 16px #ff4400, 0 0 32px rgba(255,68,0,0.5)',
+    color: '#00ffff',
+    textShadow: '0 0 16px #00ffff, 0 0 32px rgba(255,68,0,0.5)',
     lineHeight: 1.1,
   },
   comboLabel: {
     fontSize: 18,
     fontWeight: 800,
-    color: '#ffaa33',
+    color: '#00ffff',
     letterSpacing: '0.12em',
     marginTop: 4,
   },
@@ -366,7 +366,7 @@ const s = {
   },
   comboBarFill: {
     height: '100%',
-    background: 'linear-gradient(90deg, #ff4400, #ffaa00)',
+    background: 'linear-gradient(90deg, #00ffff, #0088ff)',
     borderRadius: 3,
     transition: 'width 0.05s linear',
     boxShadow: '0 0 6px rgba(255,68,0,0.6)',
