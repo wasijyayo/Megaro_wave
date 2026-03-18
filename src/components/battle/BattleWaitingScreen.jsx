@@ -28,7 +28,7 @@ function RemoteVideo({ track, style }) {
  * isHost=true  : WiFi選択UI + 開始ボタン
  * isHost=false : ホストの開始を待機
  */
-export default function BattleWaitingScreen({ roomName, isHost, liveKit, onGameStart, onLeave }) {
+export default function BattleWaitingScreen({ roomName, isHost, liveKit, onGameStart, onLeave, gbCanvas }) {
   const user     = useContext(UserContext)
   const userName = user?.displayName ?? (user?.isAnonymous ? 'ゲスト' : user?.email ?? '不明')
 
@@ -46,7 +46,16 @@ export default function BattleWaitingScreen({ roomName, isHost, liveKit, onGameS
       try {
         await connect(roomName)
         if (cancelled) return
-        await publishCamera()
+        // ──── gbCanvasからTrackを取り出す処理 ────
+        let customTrack = null
+        if (gbCanvas) {
+          // FPSを15に落としてキャプチャ(負荷軽減)
+          const stream = gbCanvas.captureStream(15) 
+          customTrack = stream.getVideoTracks()[0]
+        }
+
+        // 改造した publishCamera にカスタムトラックを渡す
+        await publishCamera(customTrack)
         setStatus('waiting')
       } catch (e) {
         if (!cancelled) setError('接続に失敗しました: ' + e.message)
@@ -54,7 +63,7 @@ export default function BattleWaitingScreen({ roomName, isHost, liveKit, onGameS
     }
     init()
     return () => { cancelled = true }
-  }, [roomName]) // eslint-disable-line
+  }, [roomName, gbCanvas]) // eslint-disable-line
 
   const opponentJoined = !!remoteParticipant
   const canStart       = isHost && opponentJoined && !!selectedWifi

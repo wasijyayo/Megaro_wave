@@ -4,12 +4,14 @@ import BattleLobbyScreen    from './BattleLobbyScreen.jsx'
 import BattleWaitingScreen  from './BattleWaitingScreen.jsx'
 import BattleGameScene      from './BattleGameScene.jsx'
 import BattleGameOver       from './BattleGameOver.jsx'
+import { usePersonSegmentation } from '../../hooks/usePersonSegmentation.js'
 
 /**
  * 対戦セッション管理
  * LiveKit 接続を維持しつつ lobby→waiting→game→gameover を制御する
  */
 export default function BattleSession({ wiiBoard, onExit }) {
+  const { canvas: myTransparentCanvas, gbCanvas: myGbCanvas } = usePersonSegmentation()
   const [phase,         setPhase]         = useState('lobby')
   // waiting / game フェーズで共有する情報
   const [roomName,      setRoomName]      = useState(null)
@@ -137,6 +139,7 @@ export default function BattleSession({ wiiBoard, onExit }) {
         roomName={roomName}
         isHost={isHost}
         liveKit={liveKit}
+        gbCanvas={myGbCanvas}
         onGameStart={handleGameStart}
         onLeave={handleLeave}
       />
@@ -153,6 +156,7 @@ export default function BattleSession({ wiiBoard, onExit }) {
         remoteVideoTrack={liveKit.remoteVideoTrack}
         opponentScore={opponentScore}
         onGameOver={handleGameOver}
+        myCanvas={myTransparentCanvas}
       />
     )
   }
