@@ -123,30 +123,6 @@ export function usePersonPoseAndSegmentation() {
               ctx.restore()
             }
 
-            // ジャンプライン (Y=0.5)
-            const jumpY = canvas.height * 0.5
-            ctx.strokeStyle = 'cyan'
-            ctx.lineWidth = 2
-            ctx.setLineDash([5, 5])
-            ctx.beginPath()
-            ctx.moveTo(0, jumpY)
-            ctx.lineTo(canvas.width, jumpY)
-            ctx.stroke()
-            ctx.fillStyle = 'cyan'
-            ctx.font = '20px sans-serif'
-            drawText('JUMP LINE (0.5)', 10, jumpY - 10)
-
-            // しゃがみライン (Y=0.75)
-            const squatY = canvas.height * 0.75
-            ctx.strokeStyle = 'red'
-            ctx.beginPath()
-            ctx.moveTo(0, squatY)
-            ctx.lineTo(canvas.width, squatY)
-            ctx.stroke()
-            ctx.fillStyle = 'red'
-            drawText('SQUAT LINE (0.75)', 10, squatY - 10)
-            ctx.setLineDash([]) // リセット
-
             // 骨格(Landmarks)の描画（オーバーレイのみ）
             if (result.landmarks && result.landmarks.length > 0) {
               const lm = result.landmarks[0]
@@ -157,13 +133,10 @@ export function usePersonPoseAndSegmentation() {
                 [11,23], [12,24], [23,24],                   // 胴体
                 [23,25], [24,26], [25,27], [26,28],          // 両脚
                 [27,29], [28,30], [29,31], [30,32],          // 足首以降
-                [0,1], [1,2], [2,3], [3,7],                  // 顔(左)
-                [0,4], [4,5], [5,6], [6,8],                  // 顔(右)
-                [9,10]                                       // 口
               ]
               
-              ctx.strokeStyle = 'white'
-              ctx.lineWidth = 2
+              ctx.strokeStyle = 'cyan'
+              ctx.lineWidth = 10
               ctx.beginPath()
               connections.forEach(([i, j]) => {
                 if (lm[i] && lm[j]) {
@@ -178,6 +151,7 @@ export function usePersonPoseAndSegmentation() {
               // --- 点(関節: Joints)の描画 ---
               ctx.fillStyle = '#00ff00'
               for (let i = 0; i < lm.length; i++) {
+                if (i <= 10) continue
                 const pt = lm[i]
                 const projected = projectLandmark(pt.x, pt.y)
                 ctx.beginPath()

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useContext } from 'react'
 import { useWifiStats } from '../hooks/useWifiStats.js'
-import { useWiiBoard } from '../hooks/useWiiBoard.js'
 import { getWaveParams } from '../utils/waveParams.js'
 import { getTopScores, logout } from '../firebase.js'
 import WifiSelectModal from './WifiSelectModal.jsx'
@@ -140,14 +139,74 @@ function BottomWave({ params, copRef }) {
 }
 
 // ── Wii Board 補正ポップアップ ───────────────────────────
-function CalibPopup({ sensors, cop, onCalibrate, sensitivity, onSensitivity, sensorScale, onSensorScale, sensorRate, onSensorRate, onClose }) {
+function CalibPopup({
+  sensors,
+  cop,
+  onCalibrate,
+  sensitivity,
+  onSensitivity,
+  sensorScale,
+  onSensorScale,
+  sensorRate,
+  onSensorRate,
+  onAutoStart,
+  onAutoApply,
+  onClose,
+}) {
   const [calibrated, setCalibrated] = useState(false)
+
+  // 自動補正（中央→左→右）のステップ状態
+  const [autoStep, setAutoStep] = useState('idle') // idle | center | left | right | done
+  const [autoCenter, setAutoCenter] = useState(null)
+  const [autoLeft,   setAutoLeft]   = useState(null)
+  const [autoRight,  setAutoRight]  = useState(null)
 
   const handleCalib = () => {
     onCalibrate()
     setCalibrated(true)
     setTimeout(() => setCalibrated(false), 1500)
   }
+
+  // 自動補正用のボタンハンドラ（1つのボタンでステップを進めていく）
+  const handleAutoButton = () => {
+    if (autoStep === 'idle' || autoStep === 'done') {
+      // 新しく自動補正を開始：内部スケールをリセットし、中央から測定開始
+      onAutoStart?.()
+      setAutoCenter(null)
+      setAutoLeft(null)
+      setAutoRight(null)
+      setAutoStep('center')
+      return
+    }
+
+    if (autoStep === 'center') {
+      setAutoCenter(cop.x)
+      setAutoStep('left')
+      return
+    }
+
+    if (autoStep === 'left') {
+      setAutoLeft(cop.x)
+      setAutoStep('right')
+      return
+    }
+
+    if (autoStep === 'right') {
+      const centerX = autoCenter ?? cop.x
+      const leftX   = autoLeft   ?? cop.x
+      const rightX  = cop.x
+      onAutoApply?.(centerX, leftX, rightX)
+      setAutoRight(rightX)
+      setAutoStep('done')
+    }
+  }
+
+  const autoLabel =
+    autoStep === 'idle' ? '自動補正開始（中央→左→右）' :
+    autoStep === 'center' ? 'ステップ1: 中央で「今の位置を記録」' :
+    autoStep === 'left' ? 'ステップ2: 左いっぱいで「今の位置を記録」' :
+    autoStep === 'right' ? 'ステップ3: 右いっぱいで「今の位置を記録」' :
+    'もう一度自動補正をやり直す'
 
   const total = sensors.topLeft + sensors.topRight + sensors.bottomLeft + sensors.bottomRight
 
@@ -258,6 +317,18 @@ function CalibPopup({ sensors, cop, onCalibrate, sensitivity, onSensitivity, sen
           {calibrated ? '補正完了 ✓' : '現在の位置を原点に補正'}
         </button>
 
+        <div style={cp.autoWrap}>
+          <div style={cp.boardLabel}>自動左右補正（中央 → 左 → 右）</div>
+          <div style={cp.autoStatus}>{autoLabel}</div>
+          <button
+            style={{ ...cp.calibBtn, background: '#388e3c' }}
+            onClick={handleAutoButton}
+            disabled={total === 0}
+          >
+            {autoStep === 'idle' || autoStep === 'done' ? '自動補正を開始' : '今の位置を記録'}
+          </button>
+        </div>
+
       </div>
     </div>
   )
@@ -353,6 +424,14 @@ const cp = {
     color: '#fff', fontSize: 14, fontWeight: 700,
     cursor: 'pointer', width: '100%',
   },
+  autoWrap: {
+    marginTop: 4,
+    display: 'flex', flexDirection: 'column', gap: 4,
+  },
+  autoStatus: {
+    fontSize: 11,
+    color: '#888',
+  },
 }
 
 // ── 難易度カラー ─────────────────────────────────────────
@@ -365,10 +444,26 @@ const LABEL_COLOR = {
 }
 
 // ── HomeScreen ───────────────────────────────────────────
-export default function HomeScreen({ onStart }) {
+export default function HomeScreen({ onStart, wiiBoard, onBattle }) {
   const user = useContext(UserContext)
   const { downlink, supported } = useWifiStats()
-  const { connected, sensors, cop, copRef, connect, disconnect, calibrate, sensitivity, setSensitivity, sensorScale, setSensorScale, sensorRate, setSensorRate } = useWiiBoard()
+  const {
+    connected,
+    sensors,
+    cop,
+    copRef,
+    connect,
+    disconnect,
+    calibrate,
+    sensitivity,
+    setSensitivity,
+    sensorScale,
+    setSensorScale,
+    sensorRate,
+    setSensorRate,
+    resetHorizontalCalibration,
+    applyHorizontalCalibration,
+  } = wiiBoard
 
 
   const [selectedWifi,  setSelectedWifi]  = useState(null)
@@ -381,7 +476,9 @@ export default function HomeScreen({ onStart }) {
   }, [])
 
   const effectiveDownlink = selectedWifi ? selectedWifi.fast : downlink
-  const params = getWaveParams(effectiveDownlink)
+  const params = selectedWifi
+    ? getWaveParams({ downlink: effectiveDownlink, strength: effectiveDownlink, ssid: selectedWifi.ssid })
+    : getWaveParams(effectiveDownlink)
   const isStorm = params.label === '嵐'
   const lightningShow = useLightning(isStorm)
 
@@ -459,14 +556,23 @@ export default function HomeScreen({ onStart }) {
               <span style={{ ...s.infoVal, color: '#00aaff' }}>
                 x{params.difficultyMultiplier.toFixed(1)}
               </span>
+              <span style={s.infoKey}>波の間隔</span>
+              <span style={s.infoVal}>{params.waveSpacing.toFixed(2)}</span>
+              <span style={s.infoKey}>波の高さ(予報)</span>
+              <span style={s.infoVal}>
+                [{params.heightPattern.slice(0, 6).join(', ')}{params.heightPattern.length > 6 ? ', …' : ''}]
+              </span>
             </div>
           </div>
 
           <div style={s.userNameDisplay}>
             {user?.displayName ?? (user?.isAnonymous ? 'ゲスト' : user?.email ?? '未ログイン')}
           </div>
-          <button style={s.startBtn} onClick={() => onStart()}>
+          <button style={s.startBtn} onClick={() => onStart(user?.displayName ?? (user?.isAnonymous ? 'ゲスト' : 'Player'), selectedWifi)}>
             Game Start
+          </button>
+          <button style={s.battleBtn} onClick={() => onBattle(selectedWifi)}>
+            対戦モード
           </button>
         </div>
 
@@ -547,6 +653,8 @@ export default function HomeScreen({ onStart }) {
           onSensorScale={setSensorScale}
           sensorRate={sensorRate}
           onSensorRate={setSensorRate}
+          onAutoStart={resetHorizontalCalibration}
+          onAutoApply={applyHorizontalCalibration}
           onClose={() => setShowCalibPopup(false)}
         />
       )}
@@ -646,6 +754,11 @@ const s = {
     background: '#1a4fc4', color: '#fff', fontSize: 15, fontWeight: 700,
     cursor: 'pointer', boxShadow: '0 0 18px rgba(26,79,196,0.5)',
     width: '100%', maxWidth: 280,
+  },
+  battleBtn: {
+    padding: '11px 0', borderRadius: 8, border: '1px solid #1e3a6a',
+    background: 'none', color: '#8bb8ff', fontSize: 14, fontWeight: 700,
+    cursor: 'pointer', width: '100%', maxWidth: 280, marginTop: 8,
   },
 
   // ランキング

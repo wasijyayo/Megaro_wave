@@ -1,4 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app'
+import { getFunctions, httpsCallable } from 'firebase/functions'
 import {
   getFirestore,
   collection,
@@ -32,13 +33,42 @@ const firebaseConfig = {
 
 const isConfigured = !!firebaseConfig.projectId
 
-let db   = null
-let auth = null
+let db        = null
+let auth      = null
+let functions = null
 
 if (isConfigured) {
   const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
-  db   = getFirestore(app)
-  auth = getAuth(app)
+  db        = getFirestore(app)
+  auth      = getAuth(app)
+  functions = getFunctions(app, 'asia-northeast1')
+}
+
+// ── LiveKit ───────────────────────────────────────────────
+
+/**
+ * Cloud Function を呼び出して LiveKit 接続トークンを取得する
+ * @param {string} roomName
+ * @returns {{ token: string, url: string }}
+ */
+export async function getLiveKitToken(roomName) {
+  if (!functions) throw new Error('Firebase が未設定です')
+  const result = await httpsCallable(functions, 'generateLiveKitToken')({ roomName })
+  return result.data
+}
+
+/** ホスト用ルーム作成 → roomName を返す */
+export async function createLiveKitRoom() {
+  if (!functions) throw new Error('Firebase が未設定です')
+  const result = await httpsCallable(functions, 'createLiveKitRoom')()
+  return result.data.roomName
+}
+
+/** 参加可能なルーム一覧を取得 */
+export async function listLiveKitRooms() {
+  if (!functions) throw new Error('Firebase が未設定です')
+  const result = await httpsCallable(functions, 'listLiveKitRooms')()
+  return result.data
 }
 
 // ── Authentication ────────────────────────────────────────

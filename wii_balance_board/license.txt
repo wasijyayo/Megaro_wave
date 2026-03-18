@@ -1,0 +1,11 @@
+Model Information:
+* title:	Wii Balance Board
+* source:	https://sketchfab.com/3d-models/wii-balance-board-b32accb435f3460b82543ce97625463f
+* author:	elephantsarecool (https://sketchfab.com/elephantsarecool)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Wii Balance Board" (https://sketchfab.com/3d-models/wii-balance-board-b32accb435f3460b82543ce97625463f) by elephantsarecool (https://sketchfab.com/elephantsarecool) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

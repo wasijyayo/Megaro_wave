@@ -32,7 +32,9 @@ export function useWiiBoard() {
   const sensitivityRef    = useRef(1.0)
   const sensorScaleRef    = useRef({ ...DEFAULT_SCALE })
   const sensorRateRef     = useRef({ ...DEFAULT_RATE })
+  const horizontalCalibRef = useRef({ center: 0, scale: 1 }) // 左右方向用の自動補正パラメータ
   const deviceRef         = useRef(null)
+  const keepaliveRef      = useRef(null)
 
   const connect = useCallback(async () => {
     if (!('hid' in navigator)) return false
@@ -45,6 +47,10 @@ export function useWiiBoard() {
       const device = devices[0]
       deviceRef.current = device
       if (!device.opened) await device.open()
+
+      // デバイスが開けた時点で「接続中」とみなす
+      // （一部環境で sendReport が失敗しても入力レポートが届くケースを考慮）
+      setConnected(true)
 
       device.addEventListener('inputreport', ({ reportId, data }) => {
         if (reportId !== 0x32) return
@@ -74,20 +80,35 @@ export function useWiiBoard() {
         const rawCoP = computeCoP(s)
 
         const sens = sensitivityRef.current
-        const calibrated = {
+        const base = {
           x:     (rawCoP.x - copOffsetRef.current.x) * sens,
           y:     (rawCoP.y - copOffsetRef.current.y) * sens,
           total: rawCoP.total,
+        }
+
+        // 左右方向の3点自動補正（center / scale）を適用
+        const { center, scale } = horizontalCalibRef.current
+        const calibrated = {
+          x:     (base.x - center) * scale,
+          y:     base.y,
+          total: base.total,
         }
         copRef.current = calibrated
         setSensors(raw)
         setCoP(calibrated)
       })
 
-      await device.sendReport(0x15, new Uint8Array([0x00]))
+      // LED 1 を点灯（スリープ防止）
+      await device.sendReport(0x11, new Uint8Array([0x10]))
       await device.sendReport(0x12, new Uint8Array([0x04, 0x32]))
 
-      setConnected(true)
+      // keepalive: 10秒ごとにレポートモードを再送してスリープ・レート低下を防ぐ
+      keepaliveRef.current = setInterval(async () => {
+        try {
+          await device.sendReport(0x12, new Uint8Array([0x04, 0x32]))
+        } catch { /* 切断済みなら無視 */ }
+      }, 10_000)
+
       return true
     } catch (e) {
       console.error('WiiBoard:', e)
@@ -96,6 +117,8 @@ export function useWiiBoard() {
   }, [])
 
   const disconnect = useCallback(async () => {
+    clearInterval(keepaliveRef.current)
+    keepaliveRef.current = null
     const device = deviceRef.current
     if (!device) return
     if (device.opened) await device.close()
@@ -143,10 +166,43 @@ export function useWiiBoard() {
     setSensorRateState(prev => ({ ...prev, [key]: v }))
   }, [])
 
+  /** 左右方向の自動補正をリセット（単位スケール・オフセット0に戻す） */
+  const resetHorizontalCalibration = useCallback(() => {
+    horizontalCalibRef.current = { center: 0, scale: 1 }
+  }, [])
+
+  /**
+   * 左右方向の3点（中央・最左・最右）から線形変換を決定する
+   * centerX: 中央に立ったときの現在の cop.x
+   * leftX:   左にめいっぱい寄ったときの cop.x
+   * rightX:  右にめいっぱい寄ったときの cop.x
+   * これらは resetHorizontalCalibration() 呼び出し後の値を使う想定
+   */
+  const applyHorizontalCalibration = useCallback((centerX, leftX, rightX) => {
+    if (!Number.isFinite(centerX) || !Number.isFinite(leftX) || !Number.isFinite(rightX)) {
+      return
+    }
+
+    const dl = Math.abs(centerX - leftX)
+    const dr = Math.abs(rightX - centerX)
+    const span = Math.max(dl, dr)
+    if (span <= 1e-6) {
+      // ほとんど動いていない場合は無視
+      horizontalCalibRef.current = { center: 0, scale: 1 }
+      return
+    }
+
+    // 中央を 0、左右の大きい方がおおよそ ±1 になるようにスケール
+    const scale = 1 / span
+    horizontalCalibRef.current = { center: centerX, scale }
+  }, [])
+
   return {
     connected, sensors, cop, copRef, connect, disconnect,
     calibrate, sensitivity, setSensitivity,
     sensorScale, setSensorScale,
     sensorRate,  setSensorRate,
+    resetHorizontalCalibration,
+    applyHorizontalCalibration,
   }
 }

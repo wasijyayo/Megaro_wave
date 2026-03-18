@@ -1,29 +1,40 @@
-const TOTAL_LIVES = 3
+import { useEffect, useRef } from 'react'
 
 export default function HUD({
   score,
   lives,
-  balance,
+  maxLives = 100,
+  balanceRef,
   waveLabel,
   difficultyMultiplier,
+  combo,
+  comboExpiryTime,
+  comboDuration,
   lastAction,
   targetPose,
   targetPoseActive,
+  boardConnected,
 }) {
   return (
     <div style={s.root}>
       {/* 左上: ライフ */}
-      <div style={{ position: 'absolute', top: 20, left: 20 }}>
+      <div style={{ position: 'absolute', top: 50, left: 50 }}>
         <div style={s.label}>LIVES</div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-          {Array.from({ length: TOTAL_LIVES }).map((_, i) => (
-            <div key={i} style={{
-              width: 18, height: 18, borderRadius: '50%',
-              background: i < lives ? '#ff4444' : '#333',
-              boxShadow: i < lives ? '0 0 8px #ff4444' : 'none',
-              transition: 'background 0.2s',
-            }} />
-          ))}
+        <div style={{ marginTop: 8, width: 180 }}>
+          <div style={{ position: 'relative', height: 14, background: '#222', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div
+              style={{
+                position: 'absolute', left: 0, top: 0, bottom: 0,
+                width: `${Math.min(Math.max(lives / (maxLives || 1), 0), 1) * 100}%`,
+                background: 'linear-gradient(90deg, #ff4444, #ffaa33, #44ff88 )',
+                transition: 'width 280ms linear',
+                boxShadow: '0 0 8px rgba(255,68,0,0.18) inset'
+              }}
+            />
+          </div>
+          <div style={{ marginTop: 6, fontSize: 12, color: '#ccc' }}>
+            {Math.round((Math.min(Math.max(lives / (maxLives || 1), 0), 1) * 100))}% &nbsp;({Math.max(0, Math.floor(lives))}/{maxLives})
+          </div>
         </div>
       </div>
 
@@ -71,13 +82,26 @@ export default function HUD({
       {/* 下中央: バランスメーター */}
       <div style={{ position: 'absolute', bottom: 28, left: '50%', transform: 'translateX(-50%)', width: 240, textAlign: 'center' }}>
         <div style={{ ...s.label, marginBottom: 6 }}>BALANCE</div>
-        <BalanceMeter balance={balance} />
-        {!balance.boardConnected && (
+        <BalanceMeter balanceRef={balanceRef} />
+        {!boardConnected && (
           <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
             Wii Board 未接続 (中央固定)
           </div>
         )}
       </div>
+
+      {/* 左中央: コンボカウンター */}
+      {combo >= 1 && (
+        <div style={s.comboArea}>
+          <div style={s.comboNumber}>🔥 x{combo}</div>
+          <div style={s.comboLabel}>COMBO</div>
+          <ComboBar
+            combo={combo}
+            comboExpiryTime={comboExpiryTime}
+            comboDuration={comboDuration}
+          />
+        </div>
+      )}
 
       {/* アクション通知 */}
       {lastAction && (
@@ -90,72 +114,123 @@ export default function HUD({
   )
 }
 
+function ComboBar({ combo, comboExpiryTime, comboDuration }) {
+  const fillRef = useRef(null)
+
+  useEffect(() => {
+    if (!fillRef.current) return undefined
+
+    if (combo < 1 || comboExpiryTime <= 0 || comboDuration <= 0) {
+      fillRef.current.style.width = '0%'
+      return undefined
+    }
+
+    let rafId
+
+    const update = () => {
+      if (!fillRef.current) return
+
+      const remaining = Math.max(comboExpiryTime - performance.now(), 0)
+      const ratio = Math.min(Math.max(remaining / comboDuration, 0), 1)
+      fillRef.current.style.width = `${ratio * 100}%`
+
+      if (remaining > 0) {
+        rafId = requestAnimationFrame(update)
+      }
+    }
+
+    fillRef.current.style.width = '100%'
+    rafId = requestAnimationFrame(update)
+    return () => cancelAnimationFrame(rafId)
+  }, [combo, comboExpiryTime, comboDuration])
+
+  return (
+    <div style={s.comboBarTrack}>
+      <div ref={fillRef} style={s.comboBarFill} />
+    </div>
+  )
+}
+
 function TargetPosePreview({ poseId, active }) {
   const stroke = active ? '#44ff88' : '#8bdcff'
 
-  // 共通パーツ: 頭・体幹
-  const head = <circle cx="48" cy="18" r="9" fill="none" stroke={stroke} strokeWidth="4" />
-  const torso = <path d="M48 27 L48 50" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+  // 共通パーツ: 頭・首・肩ライン・脇腹(台形)・腰ライン・脚(膝関節付き)
+  const head = <circle cx="48" cy="14" r="9" fill="none" stroke={stroke} strokeWidth="4" />
+  // 首
+  const neck = <path d="M48 23 L48 28" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+  // 肩ライン（左肩32 ～ 右肩64）
+  const shoulders = <path d="M32 28 L64 28" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+  // 胴体: 脇腹ライン（肩→腰、中心線なし）
+  const torso = (
+    <>
+      <path d="M32 28 L38 76" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+      <path d="M64 28 L58 76" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+    </>
+  )
+  // 腰ライン（左腰38 ～ 右腰58）
+  const hips = <path d="M38 76 L58 76" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+  // 脚（膝関節付き: 腰→膝→足）
+  const legs = (
+    <>
+      <path d="M38 76 L30 96" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+      <path d="M30 96 L26 122" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+      <path d="M58 76 L66 96" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+      <path d="M66 96 L70 122" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+    </>
+  )
 
   switch (poseId) {
     // ── 両手を頭の後ろ ──
     case 'hands-behind-head':
       return (
-        <svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true">
-          {head}{torso}
-          <path d="M48 34 L31 32" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          <path d="M48 34 L65 32" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          <path d="M31 32 Q38 24 43 22" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          <path d="M65 32 Q58 24 53 22" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          <path d="M43 24 L47 26" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" opacity="0.7" />
-          <path d="M53 24 L49 26" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" opacity="0.7" />
-          <path d="M48 50 L38 72" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          <path d="M48 50 L58 72" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+        <svg width="96" height="140" viewBox="0 0 96 140" aria-hidden="true">
+          {head}{neck}{shoulders}{torso}{hips}{legs}
+          {/* 左腕: 肩→肘→頭後ろ */}
+          <path d="M32 28 L20 20" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M20 20 Q32 10 42 14" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          {/* 右腕: 肩→肘→頭後ろ */}
+          <path d="M64 28 L76 20" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M76 20 Q64 10 54 14" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          {/* 手(後頭部) */}
+          <path d="M42 14 L46 16" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" opacity="0.7" />
+          <path d="M54 14 L50 16" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" opacity="0.7" />
         </svg>
       )
 
     // ── 両手を挙げる ──
     case 'hands-up':
       return (
-        <svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true">
-          {head}{torso}
-          {/* 両腕を真上に */}
-          <path d="M48 34 L36 28 L32 8" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          <path d="M48 34 L60 28 L64 8" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          {/* 脚 */}
-          <path d="M48 50 L38 72" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          <path d="M48 50 L58 72" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+        <svg width="96" height="140" viewBox="0 0 96 140" aria-hidden="true">
+          {head}{neck}{shoulders}{torso}{hips}{legs}
+          {/* 左腕: 肩→肘→上 */}
+          <path d="M32 28 L22 16 L16 2" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          {/* 右腕: 肩→肘→上 */}
+          <path d="M64 28 L74 16 L80 2" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
         </svg>
       )
 
     // ── 敬礼 ──
     case 'salute':
       return (
-        <svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true">
-          {head}{torso}
-          {/* 右手: 額に当てる敬礼 */}
-          <path d="M48 34 L60 30 L56 16" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          {/* 左手: 体の横に下ろす */}
-          <path d="M48 34 L34 42 L30 56" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          {/* 脚 */}
-          <path d="M48 50 L42 72" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          <path d="M48 50 L54 72" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+        <svg width="96" height="140" viewBox="0 0 96 140" aria-hidden="true">
+          {head}{neck}{shoulders}{torso}{hips}{legs}
+          {/* 右手: 肩→肘→額に当てる敬礼 */}
+          <path d="M64 28 L76 20 L58 10" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          {/* 左手: 肩→肘→体の横に下ろす */}
+          <path d="M32 28 L20 46 L16 72" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
         </svg>
       )
 
     // ── ランニングマン ──
     case 'running-man':
       return (
-        <svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true">
-          {head}{torso}
-          {/* 右腕: 右上に伸ばす（一直線） */}
-          <path d="M48 34 L62 26 L76 14" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          {/* 曲げる腕: 肩から左下へ、肘で折り返して右上へ */}
-          <path d="M48 34 L38 44" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          <path d="M38 44 L52 32" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          {/* 脚 */}
-          <path d="M48 50 L38 72" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
-          <path d="M48 50 L58 72" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+        <svg width="96" height="140" viewBox="0 0 96 140" aria-hidden="true">
+          {head}{neck}{shoulders}{torso}{hips}{legs}
+          {/* 右腕: 肩→肘→右上に伸ばす */}
+          <path d="M64 28 L78 16 L90 4" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          {/* 左腕: 肩→肘（左下）→前腕（折り返し） */}
+          <path d="M32 28 L18 44" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
+          <path d="M18 44 L36 28" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" />
         </svg>
       )
 
@@ -164,36 +239,43 @@ function TargetPosePreview({ poseId, active }) {
   }
 }
 
-function BalanceMeter({ balance }) {
-  const { copX, targetX, ok } = balance
-  const indicatorPct = Math.min(Math.max((copX    + 1) / 2, 0), 1) * 100
-  const targetPct    = Math.min(Math.max((targetX + 1) / 2, 0), 1) * 100
-  const color        = ok ? '#44ff88' : '#ff4444'
+function BalanceMeter({ balanceRef }) {
+  const trackRef     = useRef(null)
+  const zoneRef      = useRef(null)
+  const targetLineRef = useRef(null)
+  const indicatorRef = useRef(null)
+
+  useEffect(() => {
+    let rafId
+    function update() {
+      rafId = requestAnimationFrame(update)
+      const { copX, targetX, ok, calibratedX } = balanceRef.current
+      const displayX     = Number.isFinite(calibratedX) ? calibratedX : copX
+      const indicatorPct = Math.min(Math.max((displayX + 1) / 2, 0), 1) * 100
+      const targetPct    = Math.min(Math.max((targetX  + 1) / 2, 0), 1) * 100
+      const color        = ok ? '#44ff88' : '#ff4444'
+
+      if (indicatorRef.current) {
+        indicatorRef.current.style.left       = `${indicatorPct}%`
+        indicatorRef.current.style.background = color
+        indicatorRef.current.style.boxShadow  = `0 0 8px ${color}`
+      }
+      if (zoneRef.current)      zoneRef.current.style.left      = `${targetPct - 12}%`
+      if (targetLineRef.current) targetLineRef.current.style.left = `${targetPct}%`
+      if (trackRef.current)     trackRef.current.style.borderColor = color
+    }
+    rafId = requestAnimationFrame(update)
+    return () => cancelAnimationFrame(rafId)
+  }, [balanceRef])
 
   return (
-    <div style={{ position: 'relative', height: 18, background: '#111', borderRadius: 9, border: `2px solid ${color}`, overflow: 'hidden' }}>
+    <div ref={trackRef} style={{ position: 'relative', height: 18, background: '#111', borderRadius: 9, border: '2px solid #44ff88', overflow: 'hidden' }}>
       {/* 許容ゾーン */}
-      <div style={{
-        position: 'absolute', top: 0, bottom: 0,
-        left: `${targetPct - 12}%`, width: '24%',
-        background: 'rgba(68,255,136,0.15)',
-      }} />
+      <div ref={zoneRef} style={{ position: 'absolute', top: 0, bottom: 0, left: '38%', width: '24%', background: 'rgba(68,255,136,0.15)' }} />
       {/* 目標ライン */}
-      <div style={{
-        position: 'absolute', top: 0, bottom: 0,
-        left: `${targetPct}%`, width: 2,
-        background: '#44ff88', opacity: 0.8,
-      }} />
-      {/* 現在の重心 */}
-      <div style={{
-        position: 'absolute', top: '50%',
-        left: `${indicatorPct}%`,
-        transform: 'translate(-50%, -50%)',
-        width: 14, height: 14, borderRadius: '50%',
-        background: color,
-        boxShadow: `0 0 8px ${color}`,
-        transition: 'left 0.06s ease-out',
-      }} />
+      <div ref={targetLineRef} style={{ position: 'absolute', top: 0, bottom: 0, left: '50%', width: 2, background: '#44ff88', opacity: 0.8 }} />
+      {/* 現在の重心 — transition なし、RAFで直接更新 */}
+      <div ref={indicatorRef} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 14, height: 14, borderRadius: '50%', background: '#44ff88', boxShadow: '0 0 8px #44ff88' }} />
     </div>
   )
 }
@@ -221,5 +303,43 @@ const s = {
     textShadow: '0 0 24px #ffee00',
     animation: 'popupFade 1s forwards',
     pointerEvents: 'none',
+  },
+  // コンボカウンター（左側→中央寄り）
+  comboArea: {
+    position: 'absolute',
+    left: '15%',
+    top: '40%',
+    transform: 'translate(-50%, -50%)',
+    textAlign: 'center',
+    width: 160,
+  },
+  comboNumber: {
+    fontSize: 52,
+    fontWeight: 900,
+    color: '#ff6600',
+    textShadow: '0 0 16px #ff4400, 0 0 32px rgba(255,68,0,0.5)',
+    lineHeight: 1.1,
+  },
+  comboLabel: {
+    fontSize: 18,
+    fontWeight: 800,
+    color: '#ffaa33',
+    letterSpacing: '0.12em',
+    marginTop: 4,
+  },
+  comboBarTrack: {
+    marginTop: 8,
+    width: '100%',
+    height: 8,
+    background: 'rgba(255,255,255,0.15)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  comboBarFill: {
+    height: '100%',
+    background: 'linear-gradient(90deg, #ff4400, #ffaa00)',
+    borderRadius: 3,
+    transition: 'width 0.05s linear',
+    boxShadow: '0 0 6px rgba(255,68,0,0.6)',
   },
 }

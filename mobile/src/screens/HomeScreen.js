@@ -8,7 +8,7 @@ import { getWaveParams } from '../utils/waveParams'
 import { getTopScores, logout } from '../firebase'
 
 // ── Wave アニメーション ──────────────────────────────────
-function WaveBar({ amplitude, index }) {
+function WaveBar({ value, index }) {
   const anim = useRef(new Animated.Value(0)).current
   useEffect(() => {
     Animated.loop(
@@ -18,7 +18,7 @@ function WaveBar({ amplitude, index }) {
       ])
     ).start()
   }, [])
-  const height = 20 + amplitude * 18
+  const height = 16 + value * 10
   const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -(height * 0.6)] })
   return (
     <Animated.View
@@ -61,7 +61,9 @@ export default function HomeScreen({ navigation, route }) {
     }
   }, [route.params?.selectedWifi])
 
-  const params = wifiInfo ? getWaveParams(wifiInfo.fast) : getWaveParams(0)
+  const params = wifiInfo
+    ? getWaveParams({ downlink: wifiInfo.fast, strength: wifiInfo.fast, ssid: wifiInfo.ssid })
+    : getWaveParams(0)
 
   // タブレット: 横並び / スマホ: 縦並び
   const layout = isTablet ? s.rowLayout : s.colLayout
@@ -97,9 +99,19 @@ export default function HomeScreen({ navigation, route }) {
                 <Text style={s.wifiVal}>{wifiInfo.fast} Mbps</Text>
               </Text>
               <Text style={s.wifiRow}>
+                <Text style={s.wifiKey}>波の間隔　</Text>
+                <Text style={s.wifiVal}>{params.waveSpacing.toFixed(2)}</Text>
+              </Text>
+              <Text style={s.wifiRow}>
                 <Text style={s.wifiKey}>スコア倍率</Text>
                 <Text style={[s.wifiVal, { color: '#00aaff' }]}>
                   x{params.difficultyMultiplier.toFixed(1)}
+                </Text>
+              </Text>
+              <Text style={s.wifiRow}>
+                <Text style={s.wifiKey}>波の高さ</Text>
+                <Text style={s.wifiVal} numberOfLines={1}>
+                  [{params.heightPattern.slice(0, 8).join(', ')}{params.heightPattern.length > 8 ? ', …' : ''}]
                 </Text>
               </Text>
             </View>
@@ -126,7 +138,7 @@ export default function HomeScreen({ navigation, route }) {
         <View style={[s.waveBox, isTablet && { flex: 0.6 }]}>
           <View style={s.waveBars}>
             {Array.from({ length: 12 }).map((_, i) => (
-              <WaveBar key={i} amplitude={params.amplitude} index={i} />
+              <WaveBar key={i} value={params.heightPattern[i % params.heightPattern.length] ?? 1} index={i} />
             ))}
           </View>
         </View>

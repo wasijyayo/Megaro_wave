@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Environment } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
@@ -104,100 +104,168 @@ const CyberParticles = ({ speed = 1.0 }: { speed?: number }) => {
   );
 };
 
-// 波のメッシュ
-const Ocean = ({ amplitude = 0.5, frequency = 1.0, speed = 1.0 }) => {
-  const meshRef = useRef<THREE.Mesh>(null);
-  
-  // ジオメトリを準備
-  const geometry = useMemo(() => new THREE.PlaneGeometry(30, 35, 64, 64), []);
-  
-  // ベース色と頂点カラー配列を準備
-  const baseColor = useMemo(() => new THREE.Color('#0066ff'), []);
-  const colorArray = useMemo(() => {
-    const count = geometry.attributes.position.count;
-    const arr = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      arr[i * 3] = baseColor.r;
-      arr[i * 3 + 1] = baseColor.g;
-      arr[i * 3 + 2] = baseColor.b;
-    }
-    geometry.setAttribute('color', new THREE.BufferAttribute(arr, 3));
-    return arr;
-  }, [geometry, baseColor]);
-  
-  // 初期位置を保存しておく
-  const initialPositions = useMemo(() => {
-    const positions = geometry.attributes.position;
-    const array = new Float32Array(positions.array.length);
-    for (let i = 0; i < positions.array.length; i++) {
-      array[i] = positions.array[i];
-    }
-    return array;
-  }, [geometry]);
+// ── 波シェーダー（頂点変位を GPU で計算） ──────────────────
+const WAVE_VERT = /* glsl */`
+  uniform float uTime;
+  uniform float uAmplitude;
+  uniform float uWaveSpacing; // 直接渡される波の谷→谷の距離
+  uniform float uSpeed;
+  uniform float uPattern[32]; // 波の高さを配列で管理
+  uniform int   uPatternLen;
 
-  useFrame((state) => {
-    const time = state.clock.getElapsedTime();
-    const positions = geometry.attributes.position;
-    const colors = geometry.attributes.color as THREE.BufferAttribute;
+  varying float vHeight;
+  varying vec3  vNormal_w;
+
+  float getPatternValue(int index) {
+    int len = max(1, uPatternLen);
+    int i = index % len;
+    if (i < 0) i += len; // 負の剰余対応
     
-    for (let i = 0; i < positions.count; i++) {
-      const x = initialPositions[i * 3];
-      const z = initialPositions[i * 3 + 1]; // PlaneGeometryは初期X-Y平面なので、2番目が実質Z軸方向
-      
-      const y = getWaveHeight(x, z, time, amplitude, frequency, speed);
-      positions.setZ(i, y); // 回転させる前なのでZを更新
+    // WebGL で動的な配列インデックスアクセスを避けるための定数展開ループ
+    for (int j = 0; j < 32; j++) {
+      if (j == i) return uPattern[j];
     }
-    positions.needsUpdate = true;
-    geometry.computeVertexNormals(); // これをやらないと光が変になる
+    return uPattern[0];
+  }
 
-    // 頂点カラーを高さに応じて更新（波の上部を白くする）
-    if (colors) {
-      // 閾値とフェード幅（振幅に依存）
-      const peakThreshold = amplitude * 0.6; // ここを超えると白くなり始める
-      const falloff = Math.max(0.1, amplitude * 0.6);
-      for (let i = 0; i < positions.count; i++) {
-        const y = positions.getZ(i);
-        // スムースステップ的な補間: 0..1
-        let t = (y - (peakThreshold - falloff)) / (falloff * 2);
-        t = Math.max(0, Math.min(1, t));
+  void main() {
+    vec3 pos = position;
+    // uWaveSpacing は「谷→谷の距離（波長）」を表すため、
+    // 周期 2π を与えるためには 2π / wavelength を掛ける必要がある。
+    float freq = 2.0 * 3.14159265 / max(0.001, uWaveSpacing);
+    float arg  = pos.x * freq - uTime * uSpeed;
 
-        // 線形補間で白へ近づける
-        const r = THREE.MathUtils.lerp(baseColor.r, 1.0, t);
-        const g = THREE.MathUtils.lerp(baseColor.g, 1.0, t);
-        const b = THREE.MathUtils.lerp(baseColor.b, 1.0, t);
-        colors.setXYZ(i, r, g, b);
-      }
-      colors.needsUpdate = true;
+    // 現在の波（1サイクル = 2π）の位相インデックス
+    float cycleIndex = arg / (2.0 * 3.14159265);
+    
+    float fIdx0 = floor(cycleIndex);
+    int idx0 = int(fIdx0);
+    int idx1 = idx0 + 1;
+
+    float h0 = getPatternValue(idx0);
+    float h1 = getPatternValue(idx1);
+
+    // 小数部分を使って smoothstep (スプライン曲線近似) 補間
+    float fractPart = cycleIndex - fIdx0;
+    float t = smoothstep(0.0, 1.0, fractPart);
+    float heightScale = mix(h0, h1, t);
+
+    // 高さをスケールで変位させる
+    pos.z      = sin(arg) * uAmplitude * heightScale;
+    vHeight    = pos.z;
+
+    // 解析法線 計算（スケールを加味した簡易な偏微分）
+    float dzdx  = freq * uAmplitude * heightScale * cos(arg);
+    vec3  n     = normalize(vec3(-dzdx, 0.0, 1.0));
+    vNormal_w   = normalize(normalMatrix * n);
+
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+  }
+`;
+
+const WAVE_FRAG = /* glsl */`
+  uniform vec3  uBaseColor;
+  uniform float uAmplitude;
+
+  varying float vHeight;
+  varying vec3  vNormal_w;
+
+  void main() {
+    // 高さに応じて白化（波頭）
+    float threshold = uAmplitude * 0.6;
+    float falloff   = max(0.1, uAmplitude * 0.6);
+    float t = clamp((vHeight - (threshold - falloff)) / (falloff * 2.0), 0.0, 1.0);
+    vec3 color = mix(uBaseColor, vec3(1.0), t);
+
+    // シンプル Lambert 照明
+    vec3 lightDir = normalize(vec3(0.0, 1.0, 0.8));
+    float diff = max(dot(vNormal_w, lightDir), 0.0);
+    color *= (0.35 + 0.65 * diff);
+
+    gl_FragColor = vec4(color, 1.0);
+  }
+`;
+
+// ワイヤーフレームは同じ頂点変位、単色フラグメント
+const WIRE_FRAG = /* glsl */`
+  void main() {
+    gl_FragColor = vec4(0.0, 1.0, 1.0, 0.3);
+  }
+`;
+
+// 波のメッシュ（シェーダー版）
+const Ocean = ({ amplitude = 0.5, waveSpacing = 1.0, speed = 1.0, heightPattern = [] }: any) => {
+  // エイリアシング（空間解像度不足による波の逆行現象）を防ぐために十分な分割数にする
+  const geometry = useMemo(() => new THREE.PlaneGeometry(30, 35, 64, 64), []);
+
+  const { patternArray, patternLen } = useMemo(() => {
+    const arr = Array.isArray(heightPattern) && heightPattern.length > 0 ? heightPattern : [1];
+    const pArray = new Float32Array(32).fill(1.0);
+    const pLen = Math.min(arr.length, 32);
+    for (let i = 0; i < pLen; i++) {
+        pArray[i] = Math.max(1, Number(arr[i]) || 1);
     }
+    return { patternArray: pArray, patternLen: pLen };
+  }, [heightPattern]);
+
+  const waveUniforms = useMemo(() => ({
+    uTime:        { value: 0 },
+    uAmplitude:   { value: amplitude },
+    uWaveSpacing: { value: waveSpacing },
+    uSpeed:       { value: speed },
+    uBaseColor:   { value: new THREE.Color('#0066ff') },
+    uPattern:     { value: patternArray },
+    uPatternLen:  { value: patternLen },
+  }), []);
+
+  const wireUniforms = useMemo(() => ({
+    uTime:        { value: 0 },
+    uAmplitude:   { value: amplitude },
+    uWaveSpacing: { value: waveSpacing },
+    uSpeed:       { value: speed },
+    uPattern:     { value: patternArray },
+    uPatternLen:  { value: patternLen },
+  }), []);
+
+  // waveParams が変わったら uniform を同期
+  useEffect(() => {
+    waveUniforms.uAmplitude.value   = amplitude;
+    waveUniforms.uWaveSpacing.value = waveSpacing;
+    waveUniforms.uSpeed.value       = speed;
+    waveUniforms.uPattern.value     = patternArray;
+    waveUniforms.uPatternLen.value  = patternLen;
+
+    wireUniforms.uAmplitude.value   = amplitude;
+    wireUniforms.uWaveSpacing.value = waveSpacing;
+    wireUniforms.uSpeed.value       = speed;
+    wireUniforms.uPattern.value     = patternArray;
+    wireUniforms.uPatternLen.value  = patternLen;
+  }, [amplitude, waveSpacing, speed, patternArray, patternLen, waveUniforms, wireUniforms]);
+  // 毎フレームは uTime の float 1つだけ更新
+  useFrame((state) => {
+    const t = state.clock.getElapsedTime();
+    waveUniforms.uTime.value = t;
+    wireUniforms.uTime.value = t;
   });
 
   return (
     <group rotation={[-Math.PI / 2, 0, 0]}>
-      {/* ベースとなる波のメッシュ（頂点カラーを使用） */}
-      <mesh ref={meshRef} geometry={geometry}>
-        <meshPhysicalMaterial 
-          vertexColors={true}
-          transmission={0.8}
-          opacity={1} 
-          metalness={0.2} 
-          roughness={0.1} 
-          ior={1.33} 
-          thickness={1.5} 
-          attenuationColor="#003399"
-          attenuationDistance={2}
-          envMapIntensity={1.0}
+      <mesh geometry={geometry}>
+        <shaderMaterial
+          vertexShader={WAVE_VERT}
+          fragmentShader={WAVE_FRAG}
+          uniforms={waveUniforms}
         />
       </mesh>
-      
-      {/* デジタルなグリッド線（ワイヤーフレーム）を波に重ねる */}
       <mesh geometry={geometry}>
-        <meshBasicMaterial 
-          color="#00ffff" /* シアンの電脳風カラー */
-          wireframe={true} 
-          transparent={true} 
-          opacity={0.3} 
-          blending={THREE.AdditiveBlending} 
+        <shaderMaterial
+          vertexShader={WAVE_VERT}
+          fragmentShader={WIRE_FRAG}
+          uniforms={wireUniforms}
+          wireframe
+          transparent
           depthWrite={false}
+          blending={THREE.AdditiveBlending}
         />
       </mesh>
     </group>
@@ -210,9 +278,10 @@ type TrackerProps = {
   amplitude?: number;
   frequency?: number;
   speed?: number;
+  heightPattern?: number[];
 };
 
-const Tracker = ({ targetX, amplitude = 0.5, frequency = 1.0, speed = 1.0 }: TrackerProps) => {
+const Tracker = ({ targetX, amplitude = 0.5, frequency = 1.0, speed = 1.0, heightPattern = [] }: TrackerProps) => {
   const sphereRef = useRef<THREE.Mesh | null>(null);
   const radius = 0.22; // 球の半径と同程度のオフセットを適用して埋まりを防止
 
@@ -220,7 +289,7 @@ const Tracker = ({ targetX, amplitude = 0.5, frequency = 1.0, speed = 1.0 }: Tra
     const time = state.clock.getElapsedTime();
     // ここで動的に指定座標(targetX, targetZ)の波の高さを取得
     // (targetZ を廃止したため Z=0を使う)
-    const currentY = getWaveHeight(targetX, 0, time, amplitude, frequency, speed);
+    const currentY = getWaveHeight(targetX, 0, time, amplitude, frequency, speed, heightPattern);
     
     if (sphereRef.current) {
       // 波面に完全に埋まらないように、球の半径分だけ少し浮かせる
@@ -240,16 +309,19 @@ export default function BackgroundScene({
   waveParams,
   personCanvas,
   personTransform,
+  calibratedRef,
 }: {
-  waveParams?: { amplitude?: number; frequency?: number; speed?: number };
+  waveParams?: { amplitude?: number; frequency?: number; speed?: number; heightPattern?: number[] };
   personCanvas?: HTMLCanvasElement;
   personTransform?: { position?: [number, number, number]; rotation?: [number, number, number]; scale?: [number, number, number] };
+  calibratedRef?: any;
 }) {
   const params = waveParams || {
     // デフォルトの波のパラメータ
-    amplitude: 0.8,// 波の高さ
-    frequency: 1.5,// 波の密度(大きいほど細かい波になる)
-    speed: 1.0,// 波の速さ
+    amplitude: 0.8,     // 波の高さ
+    frequency: 1.5,     // 波の密度(大きいほど細かい波になる)
+    waveSpacing: 1.5,   // 波の間隔（谷→谷の距離）
+    speed: 1.0,         // 波の速さ
   };
 
   return (
@@ -287,6 +359,7 @@ export default function BackgroundScene({
           followWave={true}
           waveParams={params}
           heightOffset={2}
+          calibratedRef={calibratedRef}
         />
       )}
 
