@@ -8,6 +8,9 @@ export default function HUD({
   balanceRef,
   waveLabel,
   difficultyMultiplier,
+  combo,
+  comboExpiryTime,
+  comboDuration,
   lastAction,
   targetPose,
   targetPoseActive,
@@ -82,6 +85,19 @@ export default function HUD({
         )}
       </div>
 
+      {/* 左中央: コンボカウンター */}
+      {combo >= 1 && (
+        <div style={s.comboArea}>
+          <div style={s.comboNumber}>🔥 x{combo}</div>
+          <div style={s.comboLabel}>COMBO</div>
+          <ComboBar
+            combo={combo}
+            comboExpiryTime={comboExpiryTime}
+            comboDuration={comboDuration}
+          />
+        </div>
+      )}
+
       {/* アクション通知 */}
       {lastAction && (
         <div key={lastAction.id} style={s.actionPopup}>
@@ -89,6 +105,43 @@ export default function HUD({
           <div style={{ fontSize: 22 }}>+{lastAction.points.toLocaleString()}</div>
         </div>
       )}
+    </div>
+  )
+}
+
+function ComboBar({ combo, comboExpiryTime, comboDuration }) {
+  const fillRef = useRef(null)
+
+  useEffect(() => {
+    if (!fillRef.current) return undefined
+
+    if (combo < 1 || comboExpiryTime <= 0 || comboDuration <= 0) {
+      fillRef.current.style.width = '0%'
+      return undefined
+    }
+
+    let rafId
+
+    const update = () => {
+      if (!fillRef.current) return
+
+      const remaining = Math.max(comboExpiryTime - performance.now(), 0)
+      const ratio = Math.min(Math.max(remaining / comboDuration, 0), 1)
+      fillRef.current.style.width = `${ratio * 100}%`
+
+      if (remaining > 0) {
+        rafId = requestAnimationFrame(update)
+      }
+    }
+
+    fillRef.current.style.width = '100%'
+    rafId = requestAnimationFrame(update)
+    return () => cancelAnimationFrame(rafId)
+  }, [combo, comboExpiryTime, comboDuration])
+
+  return (
+    <div style={s.comboBarTrack}>
+      <div ref={fillRef} style={s.comboBarFill} />
     </div>
   )
 }
@@ -245,5 +298,43 @@ const s = {
     textShadow: '0 0 24px #ffee00',
     animation: 'popupFade 1s forwards',
     pointerEvents: 'none',
+  },
+  // コンボカウンター（左側→中央寄り）
+  comboArea: {
+    position: 'absolute',
+    left: '15%',
+    top: '40%',
+    transform: 'translate(-50%, -50%)',
+    textAlign: 'center',
+    width: 160,
+  },
+  comboNumber: {
+    fontSize: 52,
+    fontWeight: 900,
+    color: '#ff6600',
+    textShadow: '0 0 16px #ff4400, 0 0 32px rgba(255,68,0,0.5)',
+    lineHeight: 1.1,
+  },
+  comboLabel: {
+    fontSize: 18,
+    fontWeight: 800,
+    color: '#ffaa33',
+    letterSpacing: '0.12em',
+    marginTop: 4,
+  },
+  comboBarTrack: {
+    marginTop: 8,
+    width: '100%',
+    height: 8,
+    background: 'rgba(255,255,255,0.15)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  comboBarFill: {
+    height: '100%',
+    background: 'linear-gradient(90deg, #ff4400, #ffaa00)',
+    borderRadius: 3,
+    transition: 'width 0.05s linear',
+    boxShadow: '0 0 6px rgba(255,68,0,0.6)',
   },
 }

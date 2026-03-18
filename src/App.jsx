@@ -7,6 +7,7 @@ import GameScene     from './components/game/GameScene.jsx'
 import GameOver      from './components/game/GameOver.jsx'
 import BattleSession from './components/battle/BattleSession.jsx'
 import { useWiiBoard } from './hooks/useWiiBoard.js'
+import { useScreenBgm } from './hooks/useScreenBgm.js'
 
 export default function App() {
   const [user,       setUser]       = useState(undefined)
@@ -15,6 +16,7 @@ export default function App() {
   const [finalScore, setFinalScore] = useState(0)
 
   const wiiBoard = useWiiBoard()
+  useScreenBgm(screen === 'home' || screen === 'game' ? screen : null)
 
   useEffect(() => {
     const timer = setTimeout(() => setUser(prev => prev === undefined ? null : prev), 5000)
