@@ -642,10 +642,43 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
       {/* ロード画面（準備中） */}
       {!isGameReady && (
         <div style={s.loadingOverlay}>
-          <h2>NOW LOADING...</h2>
-          <p>API: {apiReady ? "OK" : "Heating..."}</p>
-          <p>Pose: {poseStatus}</p>
-          <p>Segment: {segStatus}</p>
+          <style>{`
+            @keyframes scanline {
+              0% { transform: translateY(-100%); }
+              100% { transform: translateY(100vh); }
+            }
+            @keyframes pulseGlow {
+              0% { text-shadow: 0 0 5px #0ff; }
+              50% { text-shadow: 0 0 20px #0ff; }
+              100% { text-shadow: 0 0 5px #0ff; }
+            }
+          `}</style>
+          <div style={s.loadingBox}>
+            <div style={s.scanline} />
+            <h2 style={s.loadingTitle}>SYSTEM INITIALIZATION</h2>
+            
+            <div style={s.statusRow}>
+              <span style={s.statusLabel}>NEURAL_API_CORE</span>
+              <span style={{...s.statusValue, color: apiReady ? "#0ff" : "#ffaa00"}}>{apiReady ? "[ ONLINE ]" : "[ HEATING... ]"}</span>
+            </div>
+            
+            <div style={s.statusRow}>
+              <span style={s.statusLabel}>MOTION_TRACKING</span>
+              <span style={{...s.statusValue, color: poseStatus === '実行中' ? "#0ff" : "#f0f"}}>{poseStatus || "SCANNING..."}</span>
+            </div>
+            
+            <div style={s.statusRow}>
+              <span style={s.statusLabel}>ENVIRONMENT_MAP</span>
+              <span style={{...s.statusValue, color: segStatus === '実行中' ? "#0ff" : "#f0f"}}>{segStatus || "ANALYZING..."}</span>
+            </div>
+            
+            <div style={s.progressBarContainer}>
+              <div style={{
+                ...s.progressBarFill, 
+                width: `${(apiReady ? 33 : 0) + (poseStatus === '実行中' ? 33 : 0) + (segStatus === '実行中' ? 34 : 0)}%`
+              }} />
+            </div>
+          </div>
         </div>
       )}
 
@@ -680,14 +713,74 @@ const s = {
     left: 0,
     width: "100%",
     height: "100%",
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
-    color: "#fff",
+    backgroundColor: "rgba(0, 5, 10, 0.85)",
+    backdropFilter: "blur(8px)",
+    color: "#0ff",
     display: "flex",
     flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
-    fontFamily: "monospace",
+    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
     zIndex: 50,
+    overflow: "hidden",
+  },
+  loadingBox: {
+    border: "1px solid rgba(0, 255, 255, 0.4)",
+    backgroundColor: "rgba(6, 17, 33, 0.7)",
+    padding: "40px",
+    borderRadius: "12px",
+    boxShadow: "0 0 30px rgba(0, 255, 255, 0.2), inset 0 0 20px rgba(0, 255, 255, 0.1)",
+    position: "relative",
+    overflow: "hidden",
+    minWidth: "360px",
+  },
+  scanline: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "10px",
+    background: "linear-gradient(to bottom, transparent, rgba(0, 255, 255, 0.4), transparent)",
+    animation: "scanline 3s linear infinite",
+    pointerEvents: "none",
+  },
+  loadingTitle: {
+    margin: "0 0 30px 0",
+    fontSize: "22px",
+    letterSpacing: "4px",
+    textAlign: "center",
+    textTransform: "uppercase",
+    animation: "pulseGlow 2s infinite",
+    borderBottom: "1px solid rgba(0, 255, 255, 0.3)",
+    paddingBottom: "15px",
+  },
+  statusRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    margin: "15px 0",
+    fontSize: "14px",
+    letterSpacing: "1px",
+  },
+  statusLabel: {
+    color: "rgba(255, 255, 255, 0.7)",
+  },
+  statusValue: {
+    fontWeight: "bold",
+    textShadow: "0 0 8px currentColor",
+  },
+  progressBarContainer: {
+    width: "100%",
+    height: "6px",
+    backgroundColor: "rgba(0, 255, 255, 0.1)",
+    marginTop: "30px",
+    borderRadius: "3px",
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: "#0ff",
+    boxShadow: "0 0 10px #0ff",
+    transition: "width 0.5s ease-out",
   },
   boardBtn: {
     position: "absolute",
