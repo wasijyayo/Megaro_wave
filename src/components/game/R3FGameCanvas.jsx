@@ -51,7 +51,7 @@ function ElapsedTimeReporter({ onElapsedTime }) {
   return null
 }
 
-export default function R3FGameCanvas({ waveParams, personCanvas, onElapsedTime, calibratedRef }) {
+export default function R3FGameCanvas({ waveParams, personCanvas, onElapsedTime, calibratedRef, remoteVideoTrack }) {
   return (
     <Canvas
       style={{ position: 'absolute', inset: 0 }}

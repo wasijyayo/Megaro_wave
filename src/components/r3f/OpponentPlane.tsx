@@ -1,6 +1,6 @@
 import { useMemo, useEffect, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { useGLTF } from '@react-three/drei'
+import { useGLTF ,Clone} from '@react-three/drei'
 import * as THREE from 'three'
 import { getWaveHeight } from '../../utils/waveParams'
 
@@ -61,7 +61,7 @@ export default function OpponentPlane({
       const y = getWaveHeight(worldX, worldZ, time, amplitude, frequency, speed, heightPattern)
       groupRef.current.position.y = y + heightOffset
       
-      // 相手の重心(CoP)は現状わからないので、とりあえず波に合わせてフワフワさせておきます
+      // 相手の重心(CoP)は現状わからないので、とりあえず波に合わせてフワフワさせるだけ
       const targetZ = Math.sin(time * speed) * 0.1
       groupRef.current.rotation.z = THREE.MathUtils.lerp(groupRef.current.rotation.z, targetZ, 0.1)
     }
@@ -107,7 +107,7 @@ export default function OpponentPlane({
       {gltf && gltf.scene && (
         <group position={[0, -PLANE_HEIGHT / 2 + 0.6, 0.5]} rotation={[-Math.PI / 2, 0, 0]}>
           {/* 自分のPersonPlaneとモデルを共有するため clone() を使います */}
-          <primitive object={gltf.scene.clone()} scale={5} rotation={[Math.PI / 2, 0, 0]} />
+          <Clone object={gltf.scene} scale={5} rotation={[Math.PI / 2, 0, 0]} />
         </group>
       )}
     </group>
