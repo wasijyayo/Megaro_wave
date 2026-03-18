@@ -51,7 +51,7 @@ function ElapsedTimeReporter({ onElapsedTime }) {
   return null
 }
 
-export default function R3FGameCanvas({ waveParams, personCanvas, onElapsedTime }) {
+export default function R3FGameCanvas({ waveParams, personCanvas, onElapsedTime, calibratedRef }) {
   return (
     <Canvas
       style={{ position: 'absolute', inset: 0 }}
@@ -62,7 +62,7 @@ export default function R3FGameCanvas({ waveParams, personCanvas, onElapsedTime 
       <CameraController />
       <ElapsedTimeReporter onElapsedTime={onElapsedTime} />
       <color attach="background" args={['#071428']} />
-      <BackgroundScene waveParams={waveParams} personCanvas={personCanvas} personTransform={PERSON_TRANSFORM} />
+      <BackgroundScene waveParams={waveParams} personCanvas={personCanvas} personTransform={PERSON_TRANSFORM} calibratedRef={calibratedRef} />
     </Canvas>
   )
 }

@@ -19,7 +19,7 @@ export default function WifiScreen({ navigation }) {
   const isTablet = width >= 768;
 
   const user = useContext(UserContext)
-  const { ssid, linkSpeed, frequency, status, error, fetch } = useWifi();
+  const { ssid, linkSpeed, strength, frequency, status, error, fetch } = useWifi();
   const [saving, setSaving] = useState(false);
 
   const band = frequency ? (frequency >= 5000 ? "5 GHz" : "2.4 GHz") : "---";
@@ -57,6 +57,14 @@ export default function WifiScreen({ navigation }) {
             <Text style={s.infoVal}>
               {status === "success" && linkSpeed != null
                 ? `${linkSpeed} Mbps`
+                : "x bps"}
+            </Text>
+          </View>
+          <View style={s.infoRow}>
+            <Text style={s.infoKey}>強度</Text>
+            <Text style={s.infoVal}>
+              {status === "success" && strength != null
+                ? `${strength} Mbps`
                 : "x bps"}
             </Text>
           </View>
