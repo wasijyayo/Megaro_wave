@@ -4,6 +4,7 @@ let sharedStream: MediaStream | null = null
 let sharedVideo: HTMLVideoElement | null = null
 let initPromise: Promise<void> | null = null
 let refCount = 0
+let stopTimer: ReturnType<typeof setTimeout> | null = null
 
 export function useSharedCamera(options?: { width?: number; height?: number }) {
   const { width = 720, height = 1280 } = options || {}
@@ -11,6 +12,12 @@ export function useSharedCamera(options?: { width?: number; height?: number }) {
   const [status, setStatus] = useState('初期化中...')
 
   useEffect(() => {
+    // StrictModeの遅延停止タイマーが残っていればキャンセル（カメラを継続使用）
+    if (stopTimer !== null) {
+      clearTimeout(stopTimer)
+      stopTimer = null
+    }
+
     refCount++
     let cancelled = false
 
@@ -43,16 +50,20 @@ export function useSharedCamera(options?: { width?: number; height?: number }) {
       cancelled = true
       refCount--
       if (refCount <= 0) {
-        if (sharedStream) {
-          sharedStream.getTracks().forEach(t => t.stop())
-        }
-        if (sharedVideo) {
-          try { sharedVideo.pause() } catch (_) {}
-          sharedVideo.srcObject = null
-        }
-        sharedStream = null
-        sharedVideo = null
-        initPromise = null
+        // すぐに停止せず少し待つ
+        // StrictModeのcleanup→remountが200ms以内に来た場合はタイマーをキャンセルして継続使用
+        stopTimer = setTimeout(() => {
+          stopTimer = null
+          if (refCount > 0) return // remountされていたら停止しない
+          sharedStream?.getTracks().forEach(t => t.stop())
+          if (sharedVideo) {
+            try { sharedVideo.pause() } catch (_) {}
+            sharedVideo.srcObject = null
+          }
+          sharedStream = null
+          sharedVideo   = null
+          initPromise   = null
+        }, 200)
       }
     }
   }, [width, height])
