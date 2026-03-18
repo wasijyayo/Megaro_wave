@@ -162,8 +162,8 @@ export function usePersonPoseAndSegmentation() {
                 [9,10]                                       // 口
               ]
               
-              ctx.strokeStyle = 'white'
-              ctx.lineWidth = 2
+              ctx.strokeStyle = 'cyan'
+              ctx.lineWidth = 10
               ctx.beginPath()
               connections.forEach(([i, j]) => {
                 if (lm[i] && lm[j]) {

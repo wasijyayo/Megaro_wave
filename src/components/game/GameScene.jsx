@@ -125,7 +125,7 @@ function isSalutePose(lm) {
   return rightWristNearEye && rightElbowRaised && leftArmDown;
 }
 
-/** ランニングマン（ボルトポーズ） — 両腕を右上に向け、右腕を伸ばし左肘を曲げる */
+/** ランニングマン — 片腕を斜め上に伸ばし、もう片腕を下に曲げる */
 function isRunningManPose(lm) {
   if (
     !lm?.[11] ||
@@ -144,32 +144,25 @@ function isRunningManPose(lm) {
   const leftWrist = lm[15],
     rightWrist = lm[16];
 
-  // 両腕が同じ方向（右上）を向いている: 両手首が体の中心より同じ側にある
-  const shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
-  const bothArmsToOneSide =
-    (leftWrist.x < shoulderCenterX && rightWrist.x < shoulderCenterX) ||
-    (leftWrist.x > shoulderCenterX && rightWrist.x > shoulderCenterX);
-
-  // 両手首が肩より上にある
   const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
-  const bothWristsRaised =
-    leftWrist.y < shoulderY + 0.05 && rightWrist.y < shoulderY + 0.05;
 
-  // 片方の肘が曲がっている（手首と肩の距離が短い ≒ 肘が曲がっている）
-  const leftArmBent =
-    Math.abs(leftWrist.x - leftShoulder.x) < 0.15 &&
+  // パターン A: 右腕が上、左腕が下
+  const rightArmUp =
+    rightWrist.y < shoulderY - 0.05 &&       // 手首が肩より上
+    rightElbow.y < rightShoulder.y + 0.05;    // 肘も肩より上
+  const leftArmDown =
+    leftWrist.y > leftShoulder.y + 0.05 &&    // 手首が肩より下
+    leftElbow.y > leftShoulder.y - 0.05;      // 肘が肩付近～下
+
+  // パターン B: 左腕が上、右腕が下（逆パターン）
+  const leftArmUp =
+    leftWrist.y < shoulderY - 0.05 &&
     leftElbow.y < leftShoulder.y + 0.05;
-  const rightArmExtended = Math.abs(rightWrist.x - rightShoulder.x) > 0.1;
-  // または逆パターン
-  const rightArmBent =
-    Math.abs(rightWrist.x - rightShoulder.x) < 0.15 &&
-    rightElbow.y < rightShoulder.y + 0.05;
-  const leftArmExtended = Math.abs(leftWrist.x - leftShoulder.x) > 0.1;
+  const rightArmDown =
+    rightWrist.y > rightShoulder.y + 0.05 &&
+    rightElbow.y > rightShoulder.y - 0.05;
 
-  const boltPose =
-    (leftArmBent && rightArmExtended) || (rightArmBent && leftArmExtended);
-
-  return bothArmsToOneSide && bothWristsRaised && boltPose;
+  return (rightArmUp && leftArmDown) || (leftArmUp && rightArmDown);
 }
 
 /** ポーズIDに応じた判定関数のディスパッチ */
