@@ -136,9 +136,10 @@ export default function PersonPlane({
             name="Surfboard"
             position={[0, (-PLANE_HEIGHT / 2 - SURFBOARD_THICKNESS / 2 - surfboardGap) + 0.7, 0]}
             rotation={[-Math.PI / 2, 0, 0]}
-            scale={[10, 10, 10]}
           >
-            <primitive object={gltf.scene.clone()} />
+            {/* clone() をやめて同じオブジェクト参照を使い、primitive に直接 scale を渡す */}
+            {/* X軸に対して90度回転させる */}
+            <primitive object={gltf.scene} scale={5} rotation={[Math.PI / 2, 0, 0]} />
           </group>
         ) : (
           <mesh
