@@ -14,6 +14,7 @@ export default function App() {
   const [screen,     setScreen]     = useState('home')
   const [playerName, setPlayerName] = useState('Player')
   const [finalScore, setFinalScore] = useState(0)
+  const [selectedWifi, setSelectedWifi] = useState(null)
 
   const wiiBoard = useWiiBoard()
   useScreenBgm(screen === 'home' || screen === 'game' ? screen : null)
@@ -27,8 +28,9 @@ export default function App() {
     return () => { clearTimeout(timer); unsubscribe() }
   }, [])
 
-  const handleStart = (name) => {
-    setPlayerName(name)
+  const handleStart = (name, wifi) => {
+    if (name) setPlayerName(name)
+    if (wifi !== undefined) setSelectedWifi(wifi)
     setScreen('game')
   }
 
@@ -57,10 +59,10 @@ export default function App() {
 
   return (
     <UserContext.Provider value={user}>
-      {screen === 'home'     && <HomeScreen onStart={handleStart} wiiBoard={wiiBoard} onBattle={() => setScreen('battle')} />}
-      {screen === 'game'     && <GameScene  playerName={playerName} onGameOver={handleGameOver} wiiBoard={wiiBoard} />}
+      {screen === 'home'     && <HomeScreen onStart={handleStart} wiiBoard={wiiBoard} onBattle={(wifi) => { if(wifi !== undefined) setSelectedWifi(wifi); setScreen('battle'); }} />}
+      {screen === 'game'     && <GameScene  playerName={playerName} onGameOver={handleGameOver} wiiBoard={wiiBoard} selectedWifi={selectedWifi} />}
       {screen === 'gameover' && <GameOver   score={finalScore} playerName={playerName} onRestart={handleRestart} />}
-      {screen === 'battle'   && <BattleSession wiiBoard={wiiBoard} onExit={() => setScreen('home')} />}
+      {screen === 'battle'   && <BattleSession wiiBoard={wiiBoard} onExit={() => setScreen('home')} selectedWifi={selectedWifi} />}
     </UserContext.Provider>
   )
 }

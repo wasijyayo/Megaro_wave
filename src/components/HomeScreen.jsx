@@ -558,7 +558,7 @@ export default function HomeScreen({ onStart, wiiBoard, onBattle }) {
               </span>
               <span style={s.infoKey}>波の間隔</span>
               <span style={s.infoVal}>{params.waveSpacing.toFixed(2)}</span>
-              <span style={s.infoKey}>波の高さ</span>
+              <span style={s.infoKey}>波の高さ(予報)</span>
               <span style={s.infoVal}>
                 [{params.heightPattern.slice(0, 6).join(', ')}{params.heightPattern.length > 6 ? ', …' : ''}]
               </span>
@@ -568,10 +568,10 @@ export default function HomeScreen({ onStart, wiiBoard, onBattle }) {
           <div style={s.userNameDisplay}>
             {user?.displayName ?? (user?.isAnonymous ? 'ゲスト' : user?.email ?? '未ログイン')}
           </div>
-          <button style={s.startBtn} onClick={() => onStart()}>
+          <button style={s.startBtn} onClick={() => onStart(user?.displayName ?? (user?.isAnonymous ? 'ゲスト' : 'Player'), selectedWifi)}>
             Game Start
           </button>
-          <button style={s.battleBtn} onClick={onBattle}>
+          <button style={s.battleBtn} onClick={() => onBattle(selectedWifi)}>
             対戦モード
           </button>
         </div>

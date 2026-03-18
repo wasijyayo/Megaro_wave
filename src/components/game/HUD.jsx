@@ -1,10 +1,9 @@
 import { useEffect, useRef } from 'react'
 
-const TOTAL_LIVES = 3
-
 export default function HUD({
   score,
   lives,
+  maxLives = 100,
   balanceRef,
   waveLabel,
   difficultyMultiplier,
@@ -19,17 +18,23 @@ export default function HUD({
   return (
     <div style={s.root}>
       {/* 左上: ライフ */}
-      <div style={{ position: 'absolute', top: 20, left: 20 }}>
+      <div style={{ position: 'absolute', top: 50, left: 50 }}>
         <div style={s.label}>LIVES</div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-          {Array.from({ length: TOTAL_LIVES }).map((_, i) => (
-            <div key={i} style={{
-              width: 18, height: 18, borderRadius: '50%',
-              background: i < lives ? '#ff4444' : '#333',
-              boxShadow: i < lives ? '0 0 8px #ff4444' : 'none',
-              transition: 'background 0.2s',
-            }} />
-          ))}
+        <div style={{ marginTop: 8, width: 180 }}>
+          <div style={{ position: 'relative', height: 14, background: '#222', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div
+              style={{
+                position: 'absolute', left: 0, top: 0, bottom: 0,
+                width: `${Math.min(Math.max(lives / (maxLives || 1), 0), 1) * 100}%`,
+                background: 'linear-gradient(90deg, #ff4444, #ffaa33, #44ff88 )',
+                transition: 'width 280ms linear',
+                boxShadow: '0 0 8px rgba(255,68,0,0.18) inset'
+              }}
+            />
+          </div>
+          <div style={{ marginTop: 6, fontSize: 12, color: '#ccc' }}>
+            {Math.round((Math.min(Math.max(lives / (maxLives || 1), 0), 1) * 100))}% &nbsp;({Math.max(0, Math.floor(lives))}/{maxLives})
+          </div>
         </div>
       </div>
 
