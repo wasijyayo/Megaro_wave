@@ -4,6 +4,7 @@ import { getWaveParams } from '../utils/waveParams.js'
 import { getTopScores, logout } from '../firebase.js'
 import WifiSelectModal from './WifiSelectModal.jsx'
 import { UserContext } from '../contexts/UserContext.js'
+import titleImg from '../assets/image/title.png'
 
 // ── 雨の密度設定 ─────────────────────────────────────────
 const RAIN_CONFIG = {
@@ -35,8 +36,9 @@ function Rain({ label }) {
           top: 0,
           width: '1.5px',
           height: `${cfg.h}px`,
-          background: `rgba(160, 210, 255, ${cfg.op})`,
+          background: `rgba(0, 255, 255, ${cfg.op * 0.8})`, // サイバーなシアンに変更
           borderRadius: '1px',
+          boxShadow: `0 0 8px rgba(0, 255, 255, 0.8)`,
           animation: `rainFall ${d.dur}s linear ${d.delay}s infinite`,
         }} />
       ))}
@@ -74,7 +76,8 @@ function Lightning() {
       {/* 画面フラッシュ */}
       <div style={{
         position: 'absolute', inset: 0,
-        background: 'rgba(255, 255, 180, 0.12)',
+        background: 'rgba(0, 255, 255, 0.1)',
+        backdropFilter: 'brightness(1.5)',
         animation: 'lightningFlash 0.22s ease-out forwards',
       }} />
       {/* 雷ボルト */}
@@ -82,14 +85,14 @@ function Lightning() {
         position: 'absolute',
         left: `${left}%`,
         top: '8%',
-        filter: 'drop-shadow(0 0 8px #ffe000) drop-shadow(0 0 16px #ffcc00)',
+        filter: 'drop-shadow(0 0 12px #00ffff) drop-shadow(0 0 24px #00ffff)',
         animation: 'lightningFlash 0.22s ease-out forwards',
       }}>
         <polygon
           points="42,4 22,72 38,72 18,146 62,58 44,58"
-          fill="#ffe830"
-          stroke="#fff8a0"
-          strokeWidth="1.5"
+          fill="#d0ffff"
+          stroke="#00ffff"
+          strokeWidth="2"
         />
       </svg>
     </div>
@@ -128,17 +131,22 @@ function BottomWave({ params, copRef }) {
     return () => cancelAnimationFrame(raf)
   }, [params.speed, params.amplitude, copRef])
 
-  const color = params.color?.surface ?? '#1a9eba'
+  const color = params.color?.surface ?? 'rgba(0, 200, 255, 0.6)'
   return (
-    <div style={{ width: '100%', height: 72, flexShrink: 0 }}>
-      <svg viewBox="0 0 1000 80" preserveAspectRatio="none" style={{ width: '100%', height: '100%' }}>
-        <path ref={pathRef} fill={color} opacity="0.88" />
+    <div style={{ width: '100%', height: 90, flexShrink: 0, position: 'relative' }}>
+        <div style={{
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(180deg, transparent 0%, rgba(0, 150, 255, 0.4) 100%)',
+            pointerEvents: 'none'
+        }} />
+      <svg viewBox="0 0 1000 80" preserveAspectRatio="none" style={{ width: '100%', height: '100%', filter: 'drop-shadow(0 -5px 10px rgba(0,255,255,0.4))' }}>
+        <path ref={pathRef} fill={color} opacity="0.8" stroke="#00ffff" strokeWidth="1" />
       </svg>
     </div>
   )
 }
 
-// ── Wii Board 補正ポップアップ ───────────────────────────
+/* --- (中略) Wii Board 補正ポップアップはデザインのみ調整 --- */
 function CalibPopup({
   sensors,
   cop,
@@ -155,8 +163,8 @@ function CalibPopup({
 }) {
   const [calibrated, setCalibrated] = useState(false)
 
-  // 自動補正（中央→左→右）のステップ状態
-  const [autoStep, setAutoStep] = useState('idle') // idle | center | left | right | done
+  // 自動補正ステップ状態
+  const [autoStep, setAutoStep] = useState('idle')
   const [autoCenter, setAutoCenter] = useState(null)
   const [autoLeft,   setAutoLeft]   = useState(null)
   const [autoRight,  setAutoRight]  = useState(null)
@@ -167,30 +175,15 @@ function CalibPopup({
     setTimeout(() => setCalibrated(false), 1500)
   }
 
-  // 自動補正用のボタンハンドラ（1つのボタンでステップを進めていく）
   const handleAutoButton = () => {
     if (autoStep === 'idle' || autoStep === 'done') {
-      // 新しく自動補正を開始：内部スケールをリセットし、中央から測定開始
       onAutoStart?.()
-      setAutoCenter(null)
-      setAutoLeft(null)
-      setAutoRight(null)
+      setAutoCenter(null); setAutoLeft(null); setAutoRight(null)
       setAutoStep('center')
       return
     }
-
-    if (autoStep === 'center') {
-      setAutoCenter(cop.x)
-      setAutoStep('left')
-      return
-    }
-
-    if (autoStep === 'left') {
-      setAutoLeft(cop.x)
-      setAutoStep('right')
-      return
-    }
-
+    if (autoStep === 'center') { setAutoCenter(cop.x); setAutoStep('left'); return }
+    if (autoStep === 'left') { setAutoLeft(cop.x); setAutoStep('right'); return }
     if (autoStep === 'right') {
       const centerX = autoCenter ?? cop.x
       const leftX   = autoLeft   ?? cop.x
@@ -203,244 +196,137 @@ function CalibPopup({
 
   const autoLabel =
     autoStep === 'idle' ? '自動補正開始（中央→左→右）' :
-    autoStep === 'center' ? 'ステップ1: 中央で「今の位置を記録」' :
-    autoStep === 'left' ? 'ステップ2: 左いっぱいで「今の位置を記録」' :
-    autoStep === 'right' ? 'ステップ3: 右いっぱいで「今の位置を記録」' :
-    'もう一度自動補正をやり直す'
+    autoStep === 'center' ? 'ステップ1: 中央で「記録」' :
+    autoStep === 'left' ? 'ステップ2: 左いっぱいで「記録」' :
+    autoStep === 'right' ? 'ステップ3: 右いっぱいで「記録」' :
+    'もう一度やり直す'
 
   const total = sensors.topLeft + sensors.topRight + sensors.bottomLeft + sensors.bottomRight
 
   return (
     <div style={cp.overlay} onClick={onClose}>
       <div style={cp.modal} onClick={e => e.stopPropagation()}>
-
         <div style={cp.header}>
-          <span style={cp.title}>wii bord 補正</span>
+          <span style={cp.title}>SYSTEM_CALIBRATION</span>
           <button style={cp.closeBtn} onClick={onClose}>✕</button>
         </div>
-
-        {/* センサー値 + 個別倍率（ボード形状に配置） */}
         <div style={cp.boardWrap}>
-          <div style={cp.boardLabel}>センサー値 / 個別倍率（生カウント）</div>
+          <div style={cp.boardLabel}>SENSORS / MULTIPLIER [RAW]</div>
           <div style={cp.boardGrid}>
             {[
-              { key: 'topLeft',     label: 'Top Left'     },
-              { key: 'topRight',    label: 'Top Right'    },
-              { key: 'bottomLeft',  label: 'Bottom Left'  },
-              { key: 'bottomRight', label: 'Bottom Right' },
+              { key: 'topLeft', label: 'TL' }, { key: 'topRight', label: 'TR' },
+              { key: 'bottomLeft', label: 'BL' }, { key: 'bottomRight', label: 'BR' },
             ].map(({ key, label }) => (
               <div key={key} style={cp.sensorCell}>
                 <div style={cp.sensorLabel}>{label}</div>
                 <div style={cp.sensorVal}>{Math.round(sensors[key])}</div>
-                {/* 倍率スライダー（黄） */}
                 <div style={cp.sensorScaleRow}>
-                  <input
-                    type="range" min="0.5" max="3.0" step="0.05"
-                    value={sensorScale[key]}
-                    onChange={e => onSensorScale(key, parseFloat(e.target.value))}
-                    style={cp.sliderSmall}
-                  />
+                  <input type="range" min="0.5" max="3.0" step="0.05" value={sensorScale[key]} onChange={e => onSensorScale(key, parseFloat(e.target.value))} style={cp.sliderSmall} />
                   <span style={cp.sensorScaleVal}>x{sensorScale[key].toFixed(2)}</span>
                 </div>
-                {/* 増加率スライダー（青）: delta × rate で増幅 */}
                 <div style={cp.sensorScaleRow}>
-                  <input
-                    type="range" min="0.1" max="5.0" step="0.05"
-                    value={sensorRate[key]}
-                    onChange={e => onSensorRate(key, parseFloat(e.target.value))}
-                    style={cp.sliderRate}
-                  />
+                  <input type="range" min="0.1" max="5.0" step="0.05" value={sensorRate[key]} onChange={e => onSensorRate(key, parseFloat(e.target.value))} style={cp.sliderRate} />
                   <span style={cp.sensorRateVal}>×{sensorRate[key].toFixed(2)}</span>
                 </div>
               </div>
             ))}
           </div>
-          <div style={cp.totalRow}>
-            合計: <span style={cp.totalVal}>{Math.round(total)}</span>
-          </div>
+          <div style={cp.totalRow}>TOTAL: <span style={cp.totalVal}>{Math.round(total)}</span></div>
         </div>
 
-        {/* 重心 (CoP) */}
         <div style={cp.copWrap}>
-          <div style={cp.boardLabel}>重心 (CoP)</div>
+          <div style={cp.boardLabel}>CENTER OF PRESSURE</div>
           <div style={cp.copGrid}>
             <div style={cp.copItem}>
-              <span style={cp.copLabel}>X（左右）</span>
-              <span style={{ ...cp.copVal, color: Math.abs(cop.x) > 0.3 ? '#ffb74d' : '#4fc3f7' }}>
-                {cop.x.toFixed(3)}
-              </span>
+              <span style={cp.copLabel}>AXIS-X</span>
+              <span style={{ ...cp.copVal, color: Math.abs(cop.x) > 0.3 ? '#ff3366' : '#00ffff' }}>{cop.x.toFixed(3)}</span>
             </div>
             <div style={cp.copItem}>
-              <span style={cp.copLabel}>Y（前後）</span>
-              <span style={{ ...cp.copVal, color: Math.abs(cop.y) > 0.3 ? '#ffb74d' : '#4fc3f7' }}>
-                {cop.y.toFixed(3)}
-              </span>
+              <span style={cp.copLabel}>AXIS-Y</span>
+              <span style={{ ...cp.copVal, color: Math.abs(cop.y) > 0.3 ? '#ff3366' : '#00ffff' }}>{cop.y.toFixed(3)}</span>
             </div>
           </div>
-          {/* 重心インジケーター */}
           <div style={cp.indicator}>
             <div style={cp.indicatorInner}>
-              <div style={cp.crossH} />
-              <div style={cp.crossV} />
-              <div style={{
-                ...cp.dot,
-                left: `calc(50% + ${cop.x * 40}%)`,
-                top:  `calc(50% - ${cop.y * 40}%)`,
-              }} />
+              <div style={cp.crossH} /><div style={cp.crossV} />
+              <div style={{ ...cp.dot, left: `calc(50% + ${cop.x * 40}%)`, top: `calc(50% - ${cop.y * 40}%)` }} />
             </div>
           </div>
         </div>
 
-        {/* グローバル感度スライダー */}
         <div style={cp.sensWrap}>
-          <div style={cp.boardLabel}>グローバル感度倍率</div>
+          <div style={cp.boardLabel}>GLOBAL SENSITIVITY</div>
           <div style={cp.sensRow}>
             <span style={cp.sensMin}>x1.0</span>
-            <input
-              type="range" min="1.0" max="5.0" step="0.1"
-              value={sensitivity}
-              onChange={e => onSensitivity(parseFloat(e.target.value))}
-              style={cp.slider}
-            />
+            <input type="range" min="1.0" max="5.0" step="0.1" value={sensitivity} onChange={e => onSensitivity(parseFloat(e.target.value))} style={cp.slider} />
             <span style={cp.sensMax}>x5.0</span>
           </div>
-          <div style={cp.sensVal}>
-            現在の感度:&ensp;
-            <span style={{ color: '#4fc3f7', fontWeight: 700 }}>x{sensitivity.toFixed(1)}</span>
-          </div>
+          <div style={cp.sensVal}>CURRENT: <span style={{ color: '#00ffff', fontWeight: 700 }}>x{sensitivity.toFixed(1)}</span></div>
         </div>
 
-        <button
-          style={{ ...cp.calibBtn, background: calibrated ? '#1565c0' : '#1a4fc4' }}
-          onClick={handleCalib}
-        >
-          {calibrated ? '補正完了 ✓' : '現在の位置を原点に補正'}
+        <button style={{ ...cp.calibBtn, background: calibrated ? 'rgba(0, 255, 255, 0.2)' : 'rgba(0, 150, 255, 0.2)', border: calibrated ? '1px solid #00ffff' : '1px solid #0096ff', boxShadow: calibrated ? '0 0 15px rgba(0,255,255,0.4)': 'none' }} onClick={handleCalib}>
+          {calibrated ? 'CALIBRATION DONE ✓' : 'SET CURRENT AS ORIGIN'}
         </button>
 
         <div style={cp.autoWrap}>
-          <div style={cp.boardLabel}>自動左右補正（中央 → 左 → 右）</div>
+          <div style={cp.boardLabel}>AUTO CALIBRATION [L/R]</div>
           <div style={cp.autoStatus}>{autoLabel}</div>
-          <button
-            style={{ ...cp.calibBtn, background: '#388e3c' }}
-            onClick={handleAutoButton}
-            disabled={total === 0}
-          >
-            {autoStep === 'idle' || autoStep === 'done' ? '自動補正を開始' : '今の位置を記録'}
+          <button style={{ ...cp.calibBtn, background: 'rgba(0, 255, 128, 0.15)', border: '1px solid #00ff80' }} onClick={handleAutoButton} disabled={total === 0}>
+            {autoStep === 'idle' || autoStep === 'done' ? 'START AUTO' : 'RECORD DATAPOINT'}
           </button>
         </div>
-
       </div>
     </div>
   )
 }
 
 const cp = {
-  overlay: {
-    position: 'fixed', inset: 0,
-    background: 'rgba(0,0,0,0.6)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    zIndex: 200,
-  },
-  modal: {
-    background: '#0e1f3d', border: '1px solid #1e3a6a',
-    borderRadius: 12, width: 420,
-    display: 'flex', flexDirection: 'column', gap: 16,
-    padding: '20px 24px',
-    boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
-  },
-  header: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-  },
-  title:    { fontSize: 16, fontWeight: 800, color: '#fff' },
-  closeBtn: {
-    background: 'none', border: 'none', color: '#666',
-    fontSize: 16, cursor: 'pointer', padding: '2px 6px',
-  },
-
-  boardWrap:  { display: 'flex', flexDirection: 'column', gap: 8 },
-  boardLabel: { fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em' },
-  boardGrid:  { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 },
-  sensorCell: {
-    background: '#071428', border: '1px solid #1e3a6a',
-    borderRadius: 8, padding: '10px 14px',
-    display: 'flex', flexDirection: 'column', gap: 4,
-  },
-  sensorLabel: { fontSize: 10, color: '#555' },
-  sensorVal:   { fontSize: 22, fontWeight: 700, color: '#fff', fontVariantNumeric: 'tabular-nums' },
-  totalRow:    { fontSize: 12, color: '#555', textAlign: 'right' },
-  totalVal:    { color: '#aaa', fontWeight: 700 },
-
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,5,15,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 },
+  modal: { background: 'rgba(4, 15, 30, 0.7)', border: '1px solid rgba(0, 255, 255, 0.3)', borderRadius: 16, width: 440, display: 'flex', flexDirection: 'column', gap: 16, padding: '24px', boxShadow: '0 0 40px rgba(0, 255, 255, 0.15), inset 0 0 20px rgba(0, 255, 255, 0.05)', backdropFilter: 'blur(16px)' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0, 255, 255, 0.2)', paddingBottom: 8 },
+  title: { fontSize: 14, fontWeight: 800, color: '#00ffff', letterSpacing: '0.15em' },
+  closeBtn: { background: 'none', border: 'none', color: '#00ffff', fontSize: 18, cursor: 'pointer', opacity: 0.7 },
+  boardWrap: { display: 'flex', flexDirection: 'column', gap: 8 },
+  boardLabel: { fontSize: 10, color: '#00ffff', textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.8 },
+  boardGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 },
+  sensorCell: { background: 'rgba(0, 20, 40, 0.6)', border: '1px solid rgba(0, 255, 255, 0.15)', borderRadius: 8, padding: '10px', display: 'flex', flexDirection: 'column', gap: 4 },
+  sensorLabel: { fontSize: 10, color: '#88ccff' },
+  sensorVal: { fontSize: 20, fontWeight: 700, color: '#fff', fontVariantNumeric: 'tabular-nums', textShadow: '0 0 8px rgba(0,255,255,0.5)' },
+  totalRow: { fontSize: 10, color: '#00ffff', textAlign: 'right', opacity: 0.8 },
+  totalVal: { color: '#fff', fontWeight: 700, fontSize: 12 },
   copWrap: { display: 'flex', flexDirection: 'column', gap: 8 },
   copGrid: { display: 'flex', gap: 12 },
-  copItem: {
-    flex: 1, background: '#071428', border: '1px solid #1e3a6a',
-    borderRadius: 8, padding: '8px 12px',
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-  },
-  copLabel: { fontSize: 11, color: '#555' },
-  copVal:   { fontSize: 18, fontWeight: 700, fontVariantNumeric: 'tabular-nums' },
-
-  indicator: {
-    background: '#071428', border: '1px solid #1e3a6a',
-    borderRadius: 8, padding: 8,
-    display: 'flex', justifyContent: 'center',
-  },
-  indicatorInner: {
-    position: 'relative', width: 120, height: 80,
-    background: '#0a1828', borderRadius: 6,
-  },
-  crossH: {
-    position: 'absolute', left: 0, right: 0, top: '50%',
-    height: 1, background: '#1e3a6a',
-  },
-  crossV: {
-    position: 'absolute', top: 0, bottom: 0, left: '50%',
-    width: 1, background: '#1e3a6a',
-  },
-  dot: {
-    position: 'absolute',
-    width: 10, height: 10, borderRadius: '50%',
-    background: '#4fc3f7',
-    transform: 'translate(-50%, -50%)',
-    boxShadow: '0 0 6px #4fc3f7',
-    transition: 'left 0.05s, top 0.05s',
-  },
-
-  sensorScaleRow: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 },
-  sliderSmall:    { flex: 1, accentColor: '#f5c518', cursor: 'pointer', height: 14 },
-  sensorScaleVal: { fontSize: 10, color: '#f5c518', fontWeight: 700, flexShrink: 0, minWidth: 34, textAlign: 'right' },
-  sliderRate:     { flex: 1, accentColor: '#4fc3f7', cursor: 'pointer', height: 14 },
-  sensorRateVal:  { fontSize: 10, color: '#4fc3f7', fontWeight: 700, flexShrink: 0, minWidth: 34, textAlign: 'right' },
-
+  copItem: { flex: 1, background: 'rgba(0, 20, 40, 0.6)', border: '1px solid rgba(0, 255, 255, 0.15)', borderRadius: 8, padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  copLabel: { fontSize: 10, color: '#88ccff' },
+  copVal: { fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums', textShadow: '0 0 5px currentColor' },
+  indicator: { background: 'rgba(0, 20, 40, 0.6)', border: '1px solid rgba(0, 255, 255, 0.15)', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'center' },
+  indicatorInner: { position: 'relative', width: '100%', height: 60, background: 'rgba(0, 5, 10, 0.5)', borderRadius: 4, overflow: 'hidden' },
+  crossH: { position: 'absolute', left: 0, right: 0, top: '50%', height: 1, background: 'rgba(0, 255, 255, 0.3)' },
+  crossV: { position: 'absolute', top: 0, bottom: 0, left: '50%', width: 1, background: 'rgba(0, 255, 255, 0.3)' },
+  dot: { position: 'absolute', width: 12, height: 12, borderRadius: '50%', background: '#00ffff', transform: 'translate(-50%, -50%)', boxShadow: '0 0 10px #00ffff, 0 0 20px #00ffff', transition: 'left 0.05s, top 0.05s' },
+  sensorScaleRow: { display: 'flex', alignItems: 'center', gap: 4 },
+  sliderSmall: { flex: 1, accentColor: '#ff00aa', cursor: 'pointer', height: 10 },
+  sensorScaleVal: { fontSize: 10, color: '#ff00aa', fontWeight: 700, flexShrink: 0, minWidth: 34, textAlign: 'right' },
+  sliderRate: { flex: 1, accentColor: '#00ffff', cursor: 'pointer', height: 10 },
+  sensorRateVal: { fontSize: 10, color: '#00ffff', fontWeight: 700, flexShrink: 0, minWidth: 34, textAlign: 'right' },
   sensWrap: { display: 'flex', flexDirection: 'column', gap: 8 },
-  sensRow:  { display: 'flex', alignItems: 'center', gap: 10 },
-  sensMin:  { fontSize: 11, color: '#555', flexShrink: 0 },
-  sensMax:  { fontSize: 11, color: '#555', flexShrink: 0 },
-  slider:   { flex: 1, accentColor: '#4fc3f7', cursor: 'pointer' },
-  sensVal:  { fontSize: 12, color: '#888', textAlign: 'center' },
-
-  calibBtn: {
-    padding: '11px 0', borderRadius: 8, border: 'none',
-    color: '#fff', fontSize: 14, fontWeight: 700,
-    cursor: 'pointer', width: '100%',
-  },
-  autoWrap: {
-    marginTop: 4,
-    display: 'flex', flexDirection: 'column', gap: 4,
-  },
-  autoStatus: {
-    fontSize: 11,
-    color: '#888',
-  },
+  sensRow: { display: 'flex', alignItems: 'center', gap: 10 },
+  sensMin: { fontSize: 10, color: '#00ffff', opacity: 0.6 },
+  sensMax: { fontSize: 10, color: '#00ffff', opacity: 0.6 },
+  slider: { flex: 1, accentColor: '#00ffff', cursor: 'pointer' },
+  sensVal: { fontSize: 10, color: '#88ccff', textAlign: 'center' },
+  calibBtn: { padding: '12px 0', borderRadius: 8, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', width: '100%', letterSpacing: '0.1em', transition: 'all 0.2s' },
+  autoWrap: { marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 },
+  autoStatus: { fontSize: 9, color: '#ffcc00', textTransform: 'uppercase' },
 }
 
 // ── 難易度カラー ─────────────────────────────────────────
 const LABEL_COLOR = {
-  '湖のように穏やか': '#4fc3f7',
-  '穏やか':           '#81d4fa',
-  '普通':             '#a5d6a7',
-  '荒れ':             '#ffb74d',
-  '嵐':               '#ef5350',
+  '湖のように穏やか': '#00ffff',
+  '穏やか':           '#44ffaa',
+  '普通':             '#ffbb00',
+  '荒れ':             '#ff5500',
+  '嵐':               '#ff0033',
 }
 
 // ── HomeScreen ───────────────────────────────────────────
@@ -448,23 +334,10 @@ export default function HomeScreen({ onStart, wiiBoard, onBattle }) {
   const user = useContext(UserContext)
   const { downlink, supported } = useWifiStats()
   const {
-    connected,
-    sensors,
-    cop,
-    copRef,
-    connect,
-    disconnect,
-    calibrate,
-    sensitivity,
-    setSensitivity,
-    sensorScale,
-    setSensorScale,
-    sensorRate,
-    setSensorRate,
-    resetHorizontalCalibration,
-    applyHorizontalCalibration,
+    connected, sensors, cop, copRef, connect, disconnect, calibrate,
+    sensitivity, setSensitivity, sensorScale, setSensorScale, sensorRate, setSensorRate,
+    resetHorizontalCalibration, applyHorizontalCalibration,
   } = wiiBoard
-
 
   const [selectedWifi,  setSelectedWifi]  = useState(null)
   const [rankings,      setRankings]      = useState([])
@@ -482,126 +355,142 @@ export default function HomeScreen({ onStart, wiiBoard, onBattle }) {
   const isStorm = params.label === '嵐'
   const lightningShow = useLightning(isStorm)
 
-  const handleConnect = async () => {
-    if (connected) {
-      await disconnect()
-    } else {
-      await connect()
-    }
-  }
-
+  const handleConnect = async () => { connected ? await disconnect() : await connect() }
   const handleCalibrate = () => setShowCalibPopup(true)
+
+  const wiiStatusColor = connected ? '#00ffaa' : '#ff3366'
+  const wiiStatusText = connected ? 'SYS.ONLINE' : 'SYS.OFFLINE'
 
   return (
     <div style={s.root}>
 
-      {/* ── エフェクト層 ── */}
+      {/* ── 背景エフェクト層 ── */}
+      <div style={s.cyberGrid} />
       <Rain label={params.label} />
       {lightningShow && <Lightning />}
 
       {/* ── ヘッダー ── */}
       <div style={s.header}>
-        <span style={s.gameName}>ゲーム名</span>
-        <div style={s.wiiStatus}>
-          <span style={{ ...s.wiiDot, background: connected ? '#4caf50' : '#555' }} />
-          <span style={{ color: connected ? '#4caf50' : '#666' }}>
-            wii bord {connected ? '接続済み' : '未接続'}
-          </span>
-          {connected && (
-            <span style={s.copDisplay}>
-              tilt: {cop.x.toFixed(2)}
-            </span>
-          )}
+        <div style={s.headerLeft}>
+            <img src={titleImg} alt="Megaro Wave" style={s.titleImg} />
         </div>
-        <div style={s.userArea}>
-          <span style={s.userName}>
-            {user?.displayName ?? (user?.isAnonymous ? 'ゲスト' : user?.email ?? '')}
-          </span>
-          <button style={s.logoutBtn} onClick={logout}>ログアウト</button>
+        
+        <div style={s.headerCenter}>
+          <div style={{ ...s.statusWidget, borderColor: wiiStatusColor, boxShadow: `0 0 10px ${wiiStatusColor}40` }}>
+            <span style={{ ...s.statusDot, background: wiiStatusColor, boxShadow: `0 0 8px ${wiiStatusColor}` }} />
+            <span style={{ color: wiiStatusColor, fontSize: 12, fontWeight: 700, letterSpacing: '0.1em' }}>WII_BOARD: {wiiStatusText}</span>
+            {connected && <span style={s.copDisplay}>AXIS: {cop.x.toFixed(2)}</span>}
+          </div>
+        </div>
+
+        <div style={s.headerRight}>
+          <div style={s.userBadge}>
+            <span style={s.userName}>{user?.displayName ?? (user?.isAnonymous ? 'GUEST_USER' : user?.email ?? '-')}</span>
+            <button style={s.logoutBtn} onClick={logout}>LOGOUT</button>
+          </div>
         </div>
       </div>
 
-      {/* ── メインコンテンツ ── */}
+      {/* ── メインコンテンツ (Glassmorphism Grid Layout) ── */}
       <div style={s.main}>
 
-        {/* 遊び方 */}
-        <div style={s.leftPanel}>
-          <div style={s.panelLabel}>遊び方</div>
-          <div style={s.howToBox}>
-            <div style={s.howToRow}><b style={s.howToKey}>Wii Balance Board</b><br />波の傾きに合わせて体重移動でバランスを保つ</div>
-            <div style={s.howToRow}><b style={s.howToKey}>ジャンプ</b><br />体を使ってジャンプ → ポイント獲得</div>
-            <div style={s.howToRow}><b style={s.howToKey}>腕を上げる</b><br />ジャンプ中に両手を挙げるとトリック判定</div>
-            <div style={s.howToRow}><b style={s.howToKey}>しゃがむ</b><br />低い波の下を潜る</div>
-            <div style={{ marginTop: 8, color: '#555', fontSize: 11 }}>
-              バランスを2秒以上崩すとライフ -1（3ライフ制）
+        {/* 左カラム: アシスト＆情報 */}
+        <div style={s.sidePanel}>
+          <div style={s.glassCard}>
+            <div style={s.cardTitle}>// HOW_TO_PLAY</div>
+            <div style={s.howToContent}>
+              <div style={s.howToRow}><span style={s.hl}>[Wii Board]</span> 波の傾きに合わせて体重移動</div>
+              <div style={s.howToRow}><span style={s.hl}>[JUMP]</span> 物理的にジャンプ → ポイント獲得</div>
+              <div style={s.howToRow}><span style={s.hl}>[TRICK]</span> ジャンプ中に両手を上げる</div>
+              <div style={s.howToRow}><span style={s.hl}>[DUCK]</span> 低い波の下を潜って回避</div>
+              <div style={s.howToSub}>※ バランスを2秒以上崩すとライフ -1 (3ライフシステム)</div>
+            </div>
+          </div>
+          
+          <div style={{...s.glassCard, flex: 1, marginTop: '16px'}}>
+            <div style={s.cardTitle}>// SYSTEM_MODULES</div>
+            <div style={s.moduleList}>
+               <button style={s.moduleBtn} onClick={() => {}}>SCAN_WIFI</button>
+               <button style={s.moduleBtn} onClick={() => setShowWifiModal(true)}>SELECT_NETWORK</button>
+               <button style={{...s.moduleBtn, color: wiiStatusColor, borderColor: wiiStatusColor}} onClick={handleConnect}>
+                  {connected ? 'DISCONNECT_BOARD' : 'CONNECT_BOARD'}
+               </button>
+               <button style={{...s.moduleBtn, opacity: connected ? 1 : 0.5}} onClick={handleCalibrate} disabled={!connected}>
+                  CALIBRATE_SENSORS
+               </button>
             </div>
           </div>
         </div>
 
-        {/* ステージカード */}
+        {/* 中央カラム: メインダッシュボード */}
         <div style={s.centerPanel}>
-          <div style={s.stageCard}>
-            <div style={s.cardLabel}>ステージ難易度</div>
-            <div style={{ ...s.stageName, color: LABEL_COLOR[params.label] ?? '#fff' }}>
-              {params.label}
+          <div style={s.mainGlassCard}>
+            <div style={s.radarBg}>
+              <div style={s.radarSweep}></div>
+              <div style={s.radarCircles}></div>
             </div>
-            <div style={s.wifiInfoGrid}>
-              <span style={s.infoKey}>wifi ssid</span>
-              <span style={s.infoVal}>
-                {selectedWifi ? selectedWifi.ssid : (supported ? '(現在の接続)' : '---')}
-              </span>
-              <span style={s.infoKey}>通信速度</span>
-              <span style={s.infoVal}>{effectiveDownlink} Mbps</span>
-              <span style={s.infoKey}>スコア倍率</span>
-              <span style={{ ...s.infoVal, color: '#00aaff' }}>
-                x{params.difficultyMultiplier.toFixed(1)}
-              </span>
-              <span style={s.infoKey}>波の間隔</span>
-              <span style={s.infoVal}>{params.waveSpacing.toFixed(2)}</span>
-              <span style={s.infoKey}>波の高さ(予報)</span>
-              <span style={s.infoVal}>
-                [{params.heightPattern.slice(0, 6).join(', ')}{params.heightPattern.length > 6 ? ', …' : ''}]
-              </span>
-            </div>
-          </div>
+            
+            <div style={{ zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+              <div style={s.cardTitleCenter}>// CURRENT_ENVIRONMENT</div>
+              <div style={{ ...s.stageName, color: LABEL_COLOR[params.label] ?? '#00ffff', textShadow: `0 0 15px ${LABEL_COLOR[params.label] ?? '#00ffff'}` }}>
+                {params.label}
+              </div>
 
-          <div style={s.userNameDisplay}>
-            {user?.displayName ?? (user?.isAnonymous ? 'ゲスト' : user?.email ?? '未ログイン')}
+              <div style={s.statsGrid}>
+                <div style={s.statBox}><div style={s.statLabel}>NETWORK</div><div style={s.statValue}>{selectedWifi ? selectedWifi.ssid : (supported ? '(CURRENT)' : 'NONE')}</div></div>
+                <div style={s.statBox}><div style={s.statLabel}>DOWNLINK</div><div style={s.statValue}>{effectiveDownlink} Mbps</div></div>
+                <div style={s.statBox}><div style={s.statLabel}>MULTIPLIER</div><div style={{...s.statValue, color:'#ffcc00'}}>x{params.difficultyMultiplier.toFixed(1)}</div></div>
+                <div style={s.statBox}><div style={s.statLabel}>WAVE_GAP</div><div style={s.statValue}>{params.waveSpacing.toFixed(2)}</div></div>
+              </div>
+
+              <div style={s.nameInputBox}>
+                 <span style={s.inputPrefix}>USER_ID {'>'}</span>
+                 <span style={s.nameDisplay}>{user?.displayName ?? (user?.isAnonymous ? 'GUEST' : user?.email ?? '---')}</span>
+              </div>
+
+              <div style={s.actionButtons}>
+                <button style={s.primaryCyberBtn} onClick={() => onStart(user?.displayName ?? (user?.isAnonymous ? 'GUEST' : 'Player'), selectedWifi)}>
+                  <span style={s.btnScanline}></span>
+                  INITIATE_GAME
+                </button>
+                <button style={s.secondaryCyberBtn} onClick={() => onBattle(selectedWifi)}>
+                  BATTLE_PROTOCOL
+                </button>
+              </div>
+            </div>
           </div>
-          <button style={s.startBtn} onClick={() => onStart(user?.displayName ?? (user?.isAnonymous ? 'ゲスト' : 'Player'), selectedWifi)}>
-            Game Start
-          </button>
-          <button style={s.battleBtn} onClick={() => onBattle(selectedWifi)}>
-            対戦モード
-          </button>
         </div>
 
-
-        {/* ランキング */}
-        <div style={s.rankPanel}>
-          <div style={s.panelLabel}>ランキング</div>
-          <div style={s.rankTable}>
-            <div style={s.rankHeaderRow}>
-              <span style={{ ...s.rankCell, flex: 0.6 }}>順位</span>
-              <span style={{ ...s.rankCell, flex: 2 }}>name</span>
-              <span style={s.rankCell}>score</span>
+        {/* 右カラム: リーダーボード */}
+        <div style={s.sidePanel}>
+          <div style={{ ...s.glassCard, height: '100%', padding: '20px' }}>
+            <div style={s.cardTitle}>// GLOBAL_RANKING</div>
+            <div style={s.rankContainer}>
+              <div style={s.rankHeader}>
+                <span style={{ flex: 0.5 }}>RNK</span>
+                <span style={{ flex: 2 }}>IDENTIFIER</span>
+                <span style={{ flex: 1, textAlign: 'right' }}>SCORE</span>
+              </div>
+              <div style={s.rankScroll}>
+                {rankings.length === 0 ? (
+                  <div style={s.rankEmpty}>NO_DATA_FOUND</div>
+                ) : (
+                  rankings.map((r, i) => {
+                    const isTop1 = i === 0;
+                    const c = i === 0 ? '#ffcf33' : i === 1 ? '#e0eaff' : i === 2 ? '#ff9966' : '#00ffff'
+                    return (
+                      <div key={r.id} style={{ ...s.rankRow, background: isTop1 ? 'rgba(255, 207, 51, 0.1)' : 'transparent', borderColor: isTop1 ? 'rgba(255, 207, 51, 0.3)' : 'rgba(0, 255, 255, 0.1)' }}>
+                        <span style={{ flex: 0.5, color: c, fontWeight: 900, textShadow: `0 0 5px ${c}` }}>0{i + 1}</span>
+                        <span style={{ flex: 2, color: '#e0f7fc', fontFamily: 'monospace', letterSpacing: '0.05em' }} title={r.id}>
+                          {r.id.length > 10 ? r.id.slice(0, 10) + '…' : r.id}
+                        </span>
+                        <span style={{ flex: 1, color: '#fff', fontWeight: 800, textAlign: 'right' }}>{r.score}</span>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
             </div>
-            {rankings.length === 0 ? (
-              <div style={s.rankEmpty}>データなし</div>
-            ) : (
-              rankings.map((r, i) => {
-                const c = i === 0 ? '#ffd700' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : '#aaa'
-                return (
-                  <div key={r.id} style={s.rankRow}>
-                    <span style={{ ...s.rankCell, flex: 0.6, color: c, fontWeight: 700 }}>{i + 1}位</span>
-                    <span style={{ ...s.rankCell, flex: 2, color: '#ccc' }} title={r.id}>
-                      {r.id.length > 10 ? r.id.slice(0, 10) + '…' : r.id}
-                    </span>
-                    <span style={{ ...s.rankCell, color: '#fff', fontWeight: 700 }}>{r.score}</span>
-                  </div>
-                )
-              })
-            )}
           </div>
         </div>
 
@@ -610,183 +499,132 @@ export default function HomeScreen({ onStart, wiiBoard, onBattle }) {
       {/* ── 下部波（Wii Board傾き連動） ── */}
       <BottomWave params={params} copRef={copRef} />
 
-      {/* ── ボトムナビ ── */}
-      <div style={s.bottomNav}>
-        <button style={s.navBtn} onClick={() => {}}>
-          wifi取得
-        </button>
-        <button style={s.navBtn} onClick={() => setShowWifiModal(true)}>
-          wifi選択
-        </button>
-        <button
-          style={{ ...s.navBtn, background: connected ? '#2e7d32' : '#5b40c9' }}
-          onClick={handleConnect}
-        >
-          wii bord {connected ? '切断' : '接続'}
-        </button>
-        <button
-          style={{ ...s.navBtn, background: '#5b40c9' }}
-          onClick={handleCalibrate}
-          disabled={!connected}
-        >
-          wii bord補正
-        </button>
-      </div>
-
-      {/* WiFi選択モーダル */}
-      {showWifiModal && (
-        <WifiSelectModal
-          onSelect={setSelectedWifi}
-          onClose={() => setShowWifiModal(false)}
-        />
-      )}
-
-      {/* wii bord補正ポップアップ */}
-      {showCalibPopup && (
-        <CalibPopup
-          sensors={sensors}
-          cop={cop}
-          onCalibrate={calibrate}
-          sensitivity={sensitivity}
-          onSensitivity={setSensitivity}
-          sensorScale={sensorScale}
-          onSensorScale={setSensorScale}
-          sensorRate={sensorRate}
-          onSensorRate={setSensorRate}
-          onAutoStart={resetHorizontalCalibration}
-          onAutoApply={applyHorizontalCalibration}
-          onClose={() => setShowCalibPopup(false)}
-        />
-      )}
-
+      {/* モーダル群は変更なし */}
+      {showWifiModal && <WifiSelectModal onSelect={setSelectedWifi} onClose={() => setShowWifiModal(false)} />}
+      
+      {showCalibPopup && <CalibPopup sensors={sensors} cop={cop} onCalibrate={calibrate} sensitivity={sensitivity} onSensitivity={setSensitivity} sensorScale={sensorScale} onSensorScale={setSensorScale} sensorRate={sensorRate} onSensorRate={setSensorRate} onAutoStart={resetHorizontalCalibration} onAutoApply={applyHorizontalCalibration} onClose={() => setShowCalibPopup(false)} />}
     </div>
   )
 }
 
+// ── CSS/Styles Definition ──
 const s = {
   root: {
     width: '100vw', height: '100vh',
     display: 'flex', flexDirection: 'column',
-    background: 'linear-gradient(180deg, #071428 0%, #040c1a 100%)',
-    color: '#fff', fontFamily: 'system-ui, sans-serif',
+    background: 'radial-gradient(circle at center, #061126 0%, #01040a 100%)',
+    color: '#e0f7fc', fontFamily: '"Consolas", "Courier New", monospace', // ハイテク感のある等幅系フォントをベースに
     overflow: 'hidden', position: 'relative',
+  },
+  cyberGrid: {
+    position: 'absolute', inset: 0,
+    backgroundImage: `
+      linear-gradient(rgba(0, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px)
+    `,
+    backgroundSize: '40px 40px',
+    backgroundPosition: 'center center',
+    zIndex: 0,
+    pointerEvents: 'none'
+  },
+  
+  // ガラスモーフ共通
+  glassCard: {
+    background: 'rgba(4, 12, 25, 0.65)',
+    backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+    border: '1px solid rgba(0, 255, 255, 0.15)',
+    borderRadius: '8px',
+    boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.5), inset 0 0 16px rgba(0, 255, 255, 0.03)',
+    display: 'flex', flexDirection: 'column', zIndex: 10,
+    position: 'relative', overflow: 'hidden'
+  },
+  cardTitle: {
+    fontSize: 12, color: '#00ffff', letterSpacing: '0.15em', fontWeight: 800,
+    borderBottom: '1px solid rgba(0,255,255,0.2)', padding: '12px 16px',
+    background: 'linear-gradient(90deg, rgba(0,255,255,0.1) 0%, transparent 100%)',
+    textShadow: '0 0 8px rgba(0,255,255,0.4)',
   },
 
   // ヘッダー
   header: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '8px 24px',
-    borderBottom: '1px solid #1e3a6a',
-    flexShrink: 0,
+    padding: '16px 32px', zIndex: 10, height: '80px',
+    borderBottom: '1px solid rgba(0,255,255,0.1)',
+    background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(5px)',
   },
-  gameName:   { fontSize: 22, fontWeight: 900, letterSpacing: '0.05em' },
-  wiiStatus:  { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 },
-  wiiDot:     { width: 8, height: 8, borderRadius: '50%', display: 'inline-block', flexShrink: 0 },
-  copDisplay: { fontSize: 11, color: '#4fc3f7', fontFamily: 'monospace', marginLeft: 4 },
-  userArea:   { display: 'flex', alignItems: 'center', gap: 10 },
-  userName:   { fontSize: 12, color: '#888' },
-  logoutBtn:  {
-    background: 'none', border: '1px solid #334',
-    borderRadius: 6, padding: '4px 10px',
-    color: '#666', fontSize: 12, cursor: 'pointer',
+  headerLeft: { flex: 1, display: 'flex', alignItems: 'center' },
+  headerCenter: { flex: 1, display: 'flex', justifyContent: 'center' },
+  headerRight: { flex: 1, display: 'flex', justifyContent: 'flex-end' },
+  
+  titleImg: { height: '36px', width: 'auto', filter: 'drop-shadow(0 0 8px rgba(0,150,255,0.8))' },
+  
+  statusWidget: {
+    display: 'flex', alignItems: 'center', gap: 10,
+    padding: '8px 20px', borderRadius: '20px',
+    background: 'rgba(0,0,0,0.6)', border: '1px solid',
   },
+  statusDot: { width: 8, height: 8, borderRadius: '50%' },
+  copDisplay: { fontSize: 11, color: '#00ffff', opacity: 0.8, marginLeft: 8 },
+
+  userBadge: { display: 'flex', alignItems: 'center', gap: 16, background: 'rgba(0, 255, 255, 0.05)', padding: '6px 16px', borderRadius: '4px', border: '1px solid rgba(0,255,255,0.2)' },
+  userName: { fontSize: 13, color: '#00ffff', letterSpacing: '0.1em' },
+  logoutBtn: { background: 'none', border: 'none', color: '#ff3366', fontSize: 11, cursor: 'pointer', fontWeight: 800, letterSpacing: '0.1em' },
 
   // メイン
-  main: {
-    flex: 1, display: 'flex', flexDirection: 'row',
-    padding: '12px 16px', gap: '14px',
-    overflow: 'hidden', minHeight: 0,
+  main: { flex: 1, display: 'flex', flexDirection: 'row', padding: '24px 32px', gap: '24px', overflow: 'hidden', minHeight: 0, zIndex: 10 },
+  sidePanel: { width: '320px', flexShrink: 0, display: 'flex', flexDirection: 'column' },
+  centerPanel: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' },
+
+  // 左: How To
+  howToContent: { padding: '16px', display: 'flex', flexDirection: 'column', gap: 12, fontSize: 12 },
+  howToRow: { color: '#aaddff', lineHeight: 1.6 },
+  hl: { color: '#00ffff', fontWeight: 700 },
+  howToSub: { marginTop: 8, color: '#ffcc00', fontSize: 10, borderLeft: '2px solid #ffcc00', paddingLeft: 8 },
+
+  // 左: Button Modules
+  moduleList: { padding: '16px', display: 'flex', flexDirection: 'column', gap: 10 },
+  moduleBtn: {
+    background: 'rgba(0, 20, 50, 0.5)', border: '1px solid rgba(0, 255, 255, 0.2)', color: '#00ffff',
+    padding: '12px', fontSize: 11, letterSpacing: '0.1em', cursor: 'pointer',
+    textAlign: 'left', position: 'relative', overflow: 'hidden', transition: 'all 0.2s',
   },
 
-  // 遊び方
-  leftPanel: {
-    width: 175, flexShrink: 0,
-    display: 'flex', flexDirection: 'column', gap: 6,
+  // 中央ダッシュボード
+  mainGlassCard: {
+    background: 'rgba(2, 8, 20, 0.7)', backdropFilter: 'blur(16px)', border: '1px solid rgba(0, 255, 255, 0.2)',
+    borderRadius: '16px', padding: '40px', width: '100%', maxWidth: '600px',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', overflow: 'hidden',
+    boxShadow: '0 0 40px rgba(0, 255, 255, 0.05), inset 0 0 30px rgba(0, 255, 255, 0.05)'
   },
-  panelLabel: {
-    fontSize: 10, color: '#555', letterSpacing: '0.12em',
-    textTransform: 'uppercase', marginBottom: 4,
-  },
-  howToBox: {
-    flex: 1,
-    border: '1px solid #1e3a6a', borderRadius: 8,
-    padding: '10px 12px', fontSize: 11, color: '#888',
-    lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: 8,
-    overflow: 'auto',
-  },
-  howToRow: {},
-  howToKey: { color: '#7aadff', fontWeight: 700 },
+  radarBg: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.1, pointerEvents: 'none' },
+  radarCircles: { width: 300, height: 300, borderRadius: '50%', border: '1px solid #00ffff', boxShadow: 'inset 0 0 20px #00ffff, 0 0 20px #00ffff' },
+  cardTitleCenter: { fontSize: 13, color: '#00ffff', letterSpacing: '0.2em', marginBottom: 16, opacity: 0.8 },
+  stageName: { fontSize: 36, fontWeight: 900, marginBottom: 32, letterSpacing: '0.1em' },
+  
+  statsGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', width: '100%', marginBottom: 32 },
+  statBox: { background: 'rgba(0, 255, 255, 0.05)', border: '1px solid rgba(0, 255, 255, 0.1)', padding: '12px 16px', borderRadius: '6px' },
+  statLabel: { fontSize: 10, color: '#00ffff', opacity: 0.6, marginBottom: 4, letterSpacing: '0.1em' },
+  statValue: { fontSize: 16, color: '#fff', fontWeight: 700 },
 
-  // ステージカード
-  centerPanel: {
-    flex: 1,
-    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    gap: 14,
+  nameInputBox: { display: 'flex', alignItems: 'center', width: '100%', padding: '12px 16px', background: 'rgba(0,0,0,0.4)', border: '1px solid #00ffff', borderRadius: '4px', marginBottom: 32 },
+  inputPrefix: { color: '#00ffff', fontSize: 12, marginRight: 12, opacity: 0.7 },
+  nameDisplay: { color: '#fff', fontSize: 14, fontWeight: 700, letterSpacing: '0.1em' },
+
+  actionButtons: { display: 'flex', flexDirection: 'column', gap: 16, width: '100%' },
+  primaryCyberBtn: {
+    position: 'relative', background: 'rgba(0, 255, 255, 0.1)', border: '1px solid #00ffff', color: '#00ffff',
+    padding: '16px 0', fontSize: 18, fontWeight: 900, letterSpacing: '0.2em', cursor: 'pointer',
+    boxShadow: '0 0 20px rgba(0, 255, 255, 0.2), inset 0 0 10px rgba(0, 255, 255, 0.2)', overflow: 'hidden', textShadow: '0 0 8px #00ffff'
   },
-  stageCard: {
-    background: '#0e1f3d', border: '1px solid #1e3a6a',
-    borderRadius: 12, padding: '18px 28px',
-    width: '100%', maxWidth: 320, textAlign: 'center',
-  },
-  cardLabel: {
-    fontSize: 10, color: '#555', letterSpacing: '0.1em',
-    textTransform: 'uppercase', marginBottom: 6,
-  },
-  stageName:     { fontSize: 22, fontWeight: 800, marginBottom: 14 },
-  wifiInfoGrid:  { display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 14px', textAlign: 'left' },
-  infoKey:       { fontSize: 12, color: '#555' },
-  infoVal:       { fontSize: 12, color: '#fff', fontWeight: 600 },
-  input: {
-    width: '100%', maxWidth: 280,
-    padding: '9px 13px', borderRadius: 8,
-    border: '1px solid #334', background: '#0e1f3d',
-    color: '#fff', fontSize: 14, outline: 'none',
-  },
-  userNameDisplay: {
-    padding: '9px 13px', borderRadius: 8,
-    border: '1px solid #334', background: '#0e1f3d',
-    color: '#7aadff', fontSize: 14,
-    width: '100%', maxWidth: 280, textAlign: 'center',
-    marginBottom: 8,
-  },
-  startBtn: {
-    padding: '11px 0', borderRadius: 8, border: 'none',
-    background: '#1a4fc4', color: '#fff', fontSize: 15, fontWeight: 700,
-    cursor: 'pointer', boxShadow: '0 0 18px rgba(26,79,196,0.5)',
-    width: '100%', maxWidth: 280,
-  },
-  battleBtn: {
-    padding: '11px 0', borderRadius: 8, border: '1px solid #1e3a6a',
-    background: 'none', color: '#8bb8ff', fontSize: 14, fontWeight: 700,
-    cursor: 'pointer', width: '100%', maxWidth: 280, marginTop: 8,
+  secondaryCyberBtn: {
+    background: 'transparent', border: '1px dashed rgba(255, 51, 102, 0.5)', color: '#ff3366',
+    padding: '14px 0', fontSize: 14, fontWeight: 700, letterSpacing: '0.15em', cursor: 'pointer', transition: 'all 0.2s',
   },
 
-  // ランキング
-  rankPanel: {
-    width: 215, flexShrink: 0,
-    display: 'flex', flexDirection: 'column', gap: 6,
-  },
-  rankTable: {
-    flex: 1, border: '1px solid #1e3a6a',
-    borderRadius: 8, overflow: 'hidden', background: '#080f1e',
-  },
-  rankHeaderRow: {
-    display: 'flex', padding: '5px 10px',
-    borderBottom: '1px solid #1e3a6a', background: '#0e1f3d',
-  },
-  rankRow:  { display: 'flex', padding: '5px 10px', borderBottom: '1px solid #0e1f3d' },
-  rankCell: { flex: 1, fontSize: 11, color: '#444', fontWeight: 600 },
-  rankEmpty:{ padding: 14, textAlign: 'center', color: '#444', fontSize: 11 },
-
-  // ボトムナビ
-  bottomNav: {
-    display: 'flex', flexShrink: 0,
-    borderTop: '1px solid #1e3a6a', background: '#040c1a',
-  },
-  navBtn: {
-    flex: 1, padding: '11px 0',
-    background: '#5b40c9', border: 'none',
-    color: '#fff', fontSize: 11, fontWeight: 600,
-    cursor: 'pointer', margin: '3px 2px', borderRadius: 4,
-  },
+  // 右リーダーボード
+  rankContainer: { display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' },
+  rankHeader: { display: 'flex', padding: '12px 16px', fontSize: 10, color: '#00ffff', opacity: 0.6, borderBottom: '1px solid rgba(0,255,255,0.2)' },
+  rankScroll: { flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' },
+  rankRow: { display: 'flex', padding: '12px 16px', borderBottom: '1px solid rgba(0,255,255,0.1)', fontSize: 13, alignItems: 'center' },
+  rankEmpty: { padding: 24, textAlign: 'center', color: '#00ffff', fontSize: 12, opacity: 0.5, letterSpacing: '0.2em' },
 }

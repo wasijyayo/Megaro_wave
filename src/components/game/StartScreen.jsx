@@ -4,6 +4,7 @@ import { getWaveParams } from '../../utils/waveParams.js'
 
 export default function StartScreen({ onStart }) {
   const [name, setName] = useState('')
+  const [isHovered, setIsHovered] = useState(false)
   const { downlink, effectiveType, supported } = useWifiStats()
   const params = getWaveParams(downlink)
 
@@ -14,16 +15,16 @@ export default function StartScreen({ onStart }) {
 
       {/* 今日のステージ */}
       <div style={s.card}>
-        <div style={s.cardLabel}>今日のステージ</div>
-        <div style={{ fontSize: 28, fontWeight: 800, margin: '8px 0' }}>{params.label}</div>
-        <div style={{ display: 'flex', gap: 24, justifyContent: 'center', fontSize: 13, color: '#aaa' }}>
-          <span>WiFi速度: <b style={{ color: '#fff' }}>{downlink} Mbps</b></span>
-          <span>スコア倍率: <b style={{ color: '#00aaff' }}>x{params.difficultyMultiplier.toFixed(1)}</b></span>
-          <span>波の間隔: <b style={{ color: '#fff' }}>{params.waveSpacing.toFixed(2)}</b></span>
+        <div style={s.cardLabel}>TODAY'S STAGE</div>
+        <div style={s.stageValue}>{params.label}</div>
+        <div style={s.statsContainer}>
+          <span>WIFI: <b style={s.cyanText}>{downlink} Mbps</b></span>
+          <span>MULT: <b style={s.cyanText}>x{params.difficultyMultiplier.toFixed(1)}</b></span>
+          <span>WAVE: <b style={s.cyanText}>{params.waveSpacing.toFixed(2)}</b></span>
         </div>
         {!supported && (
-          <div style={{ marginTop: 8, fontSize: 12, color: '#888' }}>
-            ※ Network Information API 非対応ブラウザ — デフォルト値で動作
+          <div style={s.unsupported}>
+            ※ Network Information API 非対応 — デフォルト値で動作
           </div>
         )}
       </div>
@@ -33,27 +34,29 @@ export default function StartScreen({ onStart }) {
         value={name}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && name.trim() && onStart(name.trim())}
-        placeholder="プレイヤー名を入力"
+        placeholder="PLAYER NAME"
         maxLength={20}
         style={s.input}
       />
 
       <button
         onClick={() => onStart(name.trim() || 'Player')}
-        style={s.btn}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={{ ...s.btn, ...(isHovered ? s.btnHover : {}) }}
       >
-        ゲームスタート
+        SYSTEM START
       </button>
 
       {/* 操作説明 */}
       <div style={s.help}>
-        <div style={s.helpTitle}>操作方法</div>
-        <div style={s.helpRow}><span style={s.helpKey}>Wii Balance Board</span> 波の傾きに合わせて体重移動でバランスを保つ</div>
-        <div style={s.helpRow}><span style={s.helpKey}>ジャンプ</span> 体を使ってジャンプ → ポイント獲得</div>
-        <div style={s.helpRow}><span style={s.helpKey}>腕を上げる</span> ジャンプ中に両手を挙げるとトリック判定</div>
-        <div style={s.helpRow}><span style={s.helpKey}>しゃがむ</span> 低い波の下を潜る</div>
-        <div style={{ marginTop: 8, color: '#666', fontSize: 12 }}>
-          バランスを 2 秒以上崩すとライフ -1 (3ライフ制)
+        <div style={s.helpTitle}>HOW TO PLAY</div>
+        <div style={s.helpRow}><span style={s.helpKey}>BOARD</span> 波の傾きに合わせて体重移動でバランスを保つ</div>
+        <div style={s.helpRow}><span style={s.helpKey}>JUMP</span> 体を使ってジャンプ → ポイント獲得</div>
+        <div style={s.helpRow}><span style={s.helpKey}>ARMS UP</span> ジャンプ中に両手を挙げるとトリック判定</div>
+        <div style={s.helpRow}><span style={s.helpKey}>CROUCH</span> 低い波の下を潜る</div>
+        <div style={s.helpNote}>
+          // バランスを 2 秒以上崩すとライフ -1 (3ライフ制)
         </div>
       </div>
     </div>
@@ -64,37 +67,147 @@ const s = {
   root: {
     minHeight: '100vh',
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    background: 'linear-gradient(180deg, #071428 0%, #040c1a 100%)',
-    color: '#fff', fontFamily: 'system-ui, sans-serif',
+    background: 'radial-gradient(circle at 50% 50%, #061121 0%, #02060d 100%)',
+    color: '#fff', 
+    fontFamily: '"Courier New", Courier, monospace, system-ui',
     padding: '2rem',
   },
-  title: { fontSize: 52, fontWeight: 900, letterSpacing: '0.05em', marginBottom: 6 },
-  subtitle: { color: '#888', fontSize: 14, marginBottom: 32 },
-  card: {
-    background: '#0e1f3d', border: '1px solid #1e3a6a',
-    borderRadius: 12, padding: '20px 36px', marginBottom: 28,
-    textAlign: 'center', minWidth: 320,
+  title: { 
+    fontSize: '3.5rem', 
+    fontWeight: 900, 
+    letterSpacing: '0.1em', 
+    marginBottom: '0.5rem',
+    color: '#ffffff',
+    textShadow: '0 0 10px #00ffff, 0 0 20px #00ffff',
+    textAlign: 'center'
   },
-  cardLabel: { fontSize: 12, color: '#666', letterSpacing: '0.08em', textTransform: 'uppercase' },
+  subtitle: { 
+    color: '#00ffff', 
+    fontSize: '1rem', 
+    marginBottom: '2.5rem',
+    textShadow: '0 0 5px rgba(0,255,255,0.5)',
+    letterSpacing: '0.05em'
+  },
+  card: {
+    background: 'rgba(6, 17, 33, 0.7)', 
+    border: '1px solid rgba(0, 255, 255, 0.4)',
+    backdropFilter: 'blur(12px)',
+    boxShadow: '0 0 20px rgba(0,255,255,0.15), inset 0 0 10px rgba(0,255,255,0.05)',
+    borderRadius: '12px', 
+    padding: '24px 40px', 
+    marginBottom: '2rem',
+    textAlign: 'center', 
+    minWidth: '340px',
+  },
+  cardLabel: { 
+    fontSize: '0.85rem', 
+    color: 'rgba(0, 255, 255, 0.7)', 
+    letterSpacing: '0.15em', 
+    textTransform: 'uppercase' 
+  },
+  stageValue: { 
+    fontSize: '2rem', 
+    fontWeight: 800, 
+    margin: '12px 0',
+    color: '#fff',
+    textShadow: '0 0 10px rgba(255,255,255,0.5)'
+  },
+  statsContainer: { 
+    display: 'flex', 
+    gap: '24px', 
+    justifyContent: 'center', 
+    fontSize: '0.9rem', 
+    color: 'rgba(255, 255, 255, 0.6)' 
+  },
+  cyanText: { 
+    color: '#00ffff',
+    textShadow: '0 0 5px rgba(0,255,255,0.5)'
+  },
+  unsupported: { 
+    marginTop: '12px', 
+    fontSize: '0.75rem', 
+    color: 'rgba(255, 255, 255, 0.4)' 
+  },
   input: {
-    padding: '12px 16px', borderRadius: 8, border: '1px solid #334',
-    background: '#0e1f3d', color: '#fff', fontSize: 15,
-    outline: 'none', width: 280, marginBottom: 14,
+    padding: '14px 20px', 
+    border: 'none',
+    borderBottom: '2px solid rgba(0, 255, 255, 0.5)',
+    background: 'rgba(0, 0, 0, 0.4)', 
+    color: '#00ffff', 
+    fontSize: '1rem',
+    textAlign: 'center',
+    outline: 'none', 
+    width: '300px', 
+    marginBottom: '2rem',
+    fontFamily: 'inherit',
+    letterSpacing: '0.1em',
+    textShadow: '0 0 5px rgba(0,255,255,0.3)',
+    transition: 'border-color 0.2s',
   },
   btn: {
-    padding: '14px 48px', borderRadius: 8, border: 'none',
-    background: '#1a4fc4', color: '#fff', fontSize: 17, fontWeight: 700,
-    cursor: 'pointer', marginBottom: 36,
-    boxShadow: '0 0 20px rgba(26,79,196,0.5)',
+    padding: '16px 56px', 
+    borderRadius: '4px', 
+    border: '2px solid #00ffff',
+    background: 'rgba(0, 255, 255, 0.1)', 
+    color: '#00ffff', 
+    fontSize: '1.2rem', 
+    fontWeight: 700,
+    letterSpacing: '0.15em',
+    cursor: 'pointer', 
+    marginBottom: '3rem',
+    boxShadow: '0 0 15px rgba(0, 255, 255, 0.3), inset 0 0 10px rgba(0, 255, 255, 0.2)',
+    textShadow: '0 0 8px #00ffff',
+    transition: 'all 0.2s ease-in-out',
+    fontFamily: 'inherit',
+    textTransform: 'uppercase',
+  },
+  btnHover: {
+    background: 'rgba(0, 255, 255, 0.2)',
+    boxShadow: '0 0 25px rgba(0, 255, 255, 0.5), inset 0 0 15px rgba(0, 255, 255, 0.3)',
   },
   help: {
-    background: '#0a1628', border: '1px solid #1a2e50',
-    borderRadius: 10, padding: '16px 24px', maxWidth: 480, width: '100%',
+    background: 'rgba(6, 17, 33, 0.5)', 
+    border: '1px solid rgba(0, 255, 255, 0.2)',
+    backdropFilter: 'blur(8px)',
+    borderRadius: '8px', 
+    padding: '20px 28px', 
+    maxWidth: '500px', 
+    width: '100%',
   },
-  helpTitle: { fontSize: 12, color: '#555', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 },
-  helpRow: { fontSize: 13, color: '#ccc', marginBottom: 6, lineHeight: 1.5 },
+  helpTitle: { 
+    fontSize: '0.85rem', 
+    color: 'rgba(0, 255, 255, 0.8)', 
+    letterSpacing: '0.15em', 
+    marginBottom: '16px',
+    textAlign: 'center',
+    textShadow: '0 0 5px rgba(0,255,255,0.3)'
+  },
+  helpRow: { 
+    fontSize: '0.9rem', 
+    color: 'rgba(255, 255, 255, 0.8)', 
+    marginBottom: '10px', 
+    lineHeight: 1.5,
+    display: 'flex',
+    alignItems: 'center'
+  },
   helpKey: {
-    display: 'inline-block', background: '#1a3060', borderRadius: 4,
-    padding: '1px 7px', marginRight: 8, fontSize: 12, color: '#7aadff',
+    display: 'inline-block', 
+    background: 'rgba(0, 255, 255, 0.1)', 
+    border: '1px solid rgba(0, 255, 255, 0.3)',
+    borderRadius: '4px',
+    padding: '2px 8px', 
+    marginRight: '12px', 
+    fontSize: '0.8rem', 
+    color: '#00ffff',
+    minWidth: '60px',
+    textAlign: 'center',
+    boxShadow: '0 0 5px rgba(0,255,255,0.1)'
   },
+  helpNote: { 
+    marginTop: '16px', 
+    color: 'rgba(0, 255, 255, 0.5)', 
+    fontSize: '0.8rem',
+    textAlign: 'center',
+    fontStyle: 'italic'
+  }
 }
