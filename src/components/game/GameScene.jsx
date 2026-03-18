@@ -1,16 +1,19 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import R3FGameCanvas from "./R3FGameCanvas.jsx";
 import HUD from "./HUD.jsx";
+import PoseClearEffects from "./PoseClearEffects.jsx";
 import { useWifiStats } from "../../hooks/useWifiStats.js";
 import { useWiiBoard } from "../../hooks/useWiiBoard.js";
 import { usePersonPoseAndSegmentation } from "../../hooks/usePersonPoseAndSegmentation.ts";
 import { usePersonSegmentation } from "../../hooks/usePersonSegmentation.ts";
 import { getWaveParams, calcWaveTilt } from "../../utils/waveParams.js";
+import { playSuccessChime } from "../../utils/poseClearSounds.js";
 
 // ── 定数 ──────────────────────────────────────────────────
 const TOTAL_LIVES = 3;
 const BALANCE_TOLERANCE = 1.28; // CoP と目標傾きの許容差 (-1〜1)
 const IMBALANCE_TIMEOUT = 2000; // ms: この時間超えるとライフ -1
+const COMBO_TIMEOUT = 4000; // ms: コンボが切れるまでの時間
 // ── ポーズ定義 ──────────────────────────────────────────
 const POSE_LIST = [
   { id: "hands-behind-head", label: "両手を頭の後ろ", points: 1000 },
@@ -269,6 +272,12 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
   const [currentPose, setCurrentPose] = useState(
     () => POSE_LIST[Math.floor(Math.random() * POSE_LIST.length)],
   );
+  // ── ポーズクリアエフェクト ──
+  const [poseClearEvent, setPoseClearEvent] = useState(null);
+  const comboRef = useRef(0);
+  const [combo, setCombo] = useState(0);
+  const comboExpiryRef = useRef(0); // timestamp when combo expires
+  const [comboExpiryTime, setComboExpiryTime] = useState(0);
 
   // ── ゲームロジック用 refs (state 更新による effect 再起動を避ける) ──
   const scoreRef = useRef(0);
@@ -371,8 +380,26 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
         setScore(Math.floor(scoreRef.current));
         onScoreChangeRef.current?.(Math.floor(scoreRef.current));
 
-        // ── ポーズ成功時: 次のランダムポーズに切り替え ──
+        // ── ポーズ成功時: 次のランダムポーズに切り替え + エフェクト ──
         if (POSE_LIST.some((p) => p.id === detectedAction.id)) {
+          // コンボ加算
+          comboRef.current += 1;
+          const currentCombo = comboRef.current;
+          setCombo(currentCombo);
+          comboExpiryRef.current = performance.now() + COMBO_TIMEOUT;
+          setComboExpiryTime(comboExpiryRef.current);
+
+          // サウンド再生
+          playSuccessChime(currentCombo);
+
+          // ビジュアルエフェクト発火
+          setPoseClearEvent({
+            id: Date.now(),
+            label: detectedAction.label,
+            points: detectedAction.points,
+            combo: currentCombo,
+          });
+
           const next = pickRandomPose(detectedAction.id);
           currentPoseRef.current = next;
           setCurrentPose(next);
@@ -380,6 +407,7 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
           targetPoseActiveRef.current = false;
           setTargetPoseActive(false);
         }
+        // コンボは4秒タイマーでのみリセット（非ポーズアクションでは維持）
       } else if (!detectedAction && lastActionRef.current) {
         lastActionRef.current = null;
       }
@@ -424,6 +452,23 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
     return () => cancelAnimationFrame(rafId);
   }, [copRef, onGameOver]);
 
+  useEffect(() => {
+    if (comboRef.current <= 0 || comboExpiryRef.current <= 0) {
+      return undefined;
+    }
+
+    const remainingMs = Math.max(comboExpiryRef.current - performance.now(), 0);
+
+    const timeoutId = window.setTimeout(() => {
+      comboRef.current = 0;
+      comboExpiryRef.current = 0;
+      setCombo(0);
+      setComboExpiryTime(0);
+    }, remainingMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [combo, comboExpiryTime]);
+
   return (
     <div
       style={{
@@ -450,10 +495,16 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
         balanceRef={balanceRef}
         waveLabel={getWaveParams(downlink).label}
         difficultyMultiplier={getWaveParams(downlink).difficultyMultiplier}
+        combo={combo}
+        comboExpiryTime={comboExpiryTime}
+        comboDuration={COMBO_TIMEOUT}
         lastAction={lastAction}
         targetPose={currentPose}
         targetPoseActive={targetPoseActive}
       />
+
+      {/* レイヤー: ポーズクリアエフェクト */}
+      <PoseClearEffects event={poseClearEvent} />
 
       <div style={s.maskStatus}>
         {segStatus} / {poseStatus}
