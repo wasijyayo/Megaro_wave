@@ -572,15 +572,6 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
             multiplier: getComboMultiplier(currentCombo),
           });
           advanceTargetPose(detectedAction.id);
-        } else {
-          earnedPoints = addScoreRef.current(detectedAction.points);
-          const newAction = {
-            id: Date.now(),
-            label: detectedAction.label,
-            points: Math.round(earnedPoints),
-          };
-          lastActionRef.current = newAction;
-          setLastAction(newAction);
         }
         // コンボは4秒タイマーでのみリセット（非ポーズアクションでは維持）
       } else if (!detectedAction && lastActionRef.current) {
