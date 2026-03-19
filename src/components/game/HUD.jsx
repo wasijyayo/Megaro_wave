@@ -366,9 +366,9 @@ const s = {
   },
   comboBarFill: {
     height: '100%',
-    background: 'linear-gradient(90deg, #00ffff, #0088ff)',
+    background: 'linear-gradient(90deg, #ff6b6b, #ff1f1f)',
     borderRadius: 3,
     transition: 'width 0.05s linear',
-    boxShadow: '0 0 6px rgba(255,68,0,0.6)',
+    boxShadow: '0 0 8px rgba(255, 31, 31, 0.7)',
   },
 }
