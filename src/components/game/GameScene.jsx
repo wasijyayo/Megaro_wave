@@ -15,6 +15,7 @@ const TOTAL_LIVES = 100;
 const BALANCE_TOLERANCE = 0.28; // CoP と目標傾きの許容差 (-1〜1)
 const IMBALANCE_TIMEOUT = 20; // ms: この時間超えるとライフ -1
 const COMBO_TIMEOUT = 4000; // ms: コンボが切れるまでの時間
+const TARGET_POSE_TIMEOUT = 10000; // ms: 目標ポーズの制限時間
 const COMBO_SCORE_MULTIPLIER = 1.1;
 
 function getComboMultiplier(comboCount) {
@@ -392,6 +393,9 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
   const [currentPose, setCurrentPose] = useState(
     () => POSE_LIST[Math.floor(Math.random() * POSE_LIST.length)],
   );
+  const [targetPoseExpiryTime, setTargetPoseExpiryTime] = useState(
+    () => performance.now() + TARGET_POSE_TIMEOUT,
+  );
   // ── ポーズクリアエフェクト ──
   const [poseClearEvent, setPoseClearEvent] = useState(null);
   const comboRef = useRef(0);
@@ -408,6 +412,7 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
   const lastActionRef = useRef(null);
   const targetPoseActiveRef = useRef(false);
   const currentPoseRef = useRef(currentPose);
+  const targetPoseExpiryRef = useRef(targetPoseExpiryTime);
 
   // waveParams を ref に同期
   useEffect(() => {
@@ -444,6 +449,10 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
     currentPoseRef.current = currentPose;
   }, [currentPose]);
 
+  useEffect(() => {
+    targetPoseExpiryRef.current = targetPoseExpiryTime;
+  }, [targetPoseExpiryTime]);
+
   // ── ゲーム準備チェック ──
   const [apiReady, setApiReady] = useState(false);
   useEffect(() => {
@@ -461,16 +470,33 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
 
     let rafId;
 
+    const advanceTargetPose = (currentId) => {
+      const next = pickRandomPose(currentId);
+      const nextExpiry = performance.now() + TARGET_POSE_TIMEOUT;
+      currentPoseRef.current = next;
+      targetPoseActiveRef.current = false;
+      targetPoseExpiryRef.current = nextExpiry;
+      setCurrentPose(next);
+      setTargetPoseActive(false);
+      setTargetPoseExpiryTime(nextExpiry);
+    };
+
     const loop = (timestamp) => {
       rafId = requestAnimationFrame(loop);
 
       const wpf = waveParamsRef.current;
       const elapsedTime = elapsedTimeRef.current;
       const currentPoseData = poseDataRef.current;
+      const now = performance.now();
 
       // ── ポーズ判定 (MediaPipe Landmarks) ──
 
       const activePose = currentPoseRef.current;
+      if (now >= targetPoseExpiryRef.current) {
+        advanceTargetPose(activePose.id);
+        return;
+      }
+
       let detectedAction = null;
       if (
         currentPoseData &&
@@ -544,13 +570,7 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
             points: displayPoints,
             combo: currentCombo,
           });
-
-          const next = pickRandomPose(detectedAction.id);
-          currentPoseRef.current = next;
-          setCurrentPose(next);
-          // ポーズ成功フラグをリセット
-          targetPoseActiveRef.current = false;
-          setTargetPoseActive(false);
+          advanceTargetPose(detectedAction.id);
         } else {
           earnedPoints = addScoreRef.current(detectedAction.points);
           const newAction = {
@@ -656,6 +676,8 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
         comboDuration={COMBO_TIMEOUT}
         lastAction={lastAction}
         targetPose={currentPose}
+        targetPoseExpiryTime={targetPoseExpiryTime}
+        targetPoseDuration={TARGET_POSE_TIMEOUT}
         targetPoseActive={targetPoseActive}
       />
 

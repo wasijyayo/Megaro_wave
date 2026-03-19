@@ -13,6 +13,8 @@ export default function HUD({
   comboDuration,
   lastAction,
   targetPose,
+  targetPoseExpiryTime,
+  targetPoseDuration = 10000,
   targetPoseActive,
   boardConnected,
 }) {
@@ -76,6 +78,10 @@ export default function HUD({
             <div style={{ marginTop: 4, fontSize: 12, color: targetPoseActive ? '#00ff88' : '#8bdcff', textAlign: 'center' }}>
               成功で +{targetPose.points.toLocaleString()}
             </div>
+            <TargetPoseTimerBar
+              expiryTime={targetPoseExpiryTime}
+              duration={targetPoseDuration}
+            />
           </div>
         )}
       </div>
@@ -149,6 +155,45 @@ function ComboBar({ combo, comboExpiryTime, comboDuration }) {
   return (
     <div style={s.comboBarTrack}>
       <div ref={fillRef} style={s.comboBarFill} />
+    </div>
+  )
+}
+
+function TargetPoseTimerBar({ expiryTime, duration }) {
+  const fillRef = useRef(null)
+
+  useEffect(() => {
+    if (!fillRef.current) return undefined
+
+    if (expiryTime <= 0 || duration <= 0) {
+      fillRef.current.style.width = '0%'
+      return undefined
+    }
+
+    let rafId
+
+    const update = () => {
+      if (!fillRef.current) return
+
+      const remaining = Math.max(expiryTime - performance.now(), 0)
+      const ratio = Math.min(Math.max(remaining / duration, 0), 1)
+      fillRef.current.style.width = `${ratio * 100}%`
+
+      if (remaining > 0) {
+        rafId = requestAnimationFrame(update)
+      }
+    }
+
+    rafId = requestAnimationFrame(update)
+    return () => cancelAnimationFrame(rafId)
+  }, [expiryTime, duration])
+
+  return (
+    <div style={s.targetPoseTimerWrap}>
+      <div style={s.targetPoseTimerLabel}>NEXT POSE</div>
+      <div style={s.targetPoseTimerTrack}>
+        <div ref={fillRef} style={s.targetPoseTimerFill} />
+      </div>
     </div>
   )
 }
@@ -390,5 +435,31 @@ const s = {
     borderRadius: 999,
     transition: 'width 0.05s linear',
     boxShadow: '0 0 16px rgba(255, 31, 31, 0.85)',
+  },
+  targetPoseTimerWrap: {
+    marginTop: 10,
+  },
+  targetPoseTimerLabel: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.55)',
+    letterSpacing: '0.14em',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  targetPoseTimerTrack: {
+    width: '100%',
+    height: 8,
+    background: 'rgba(255,255,255,0.12)',
+    borderRadius: 999,
+    overflow: 'hidden',
+    border: '1px solid rgba(255,255,255,0.08)',
+    boxShadow: 'inset 0 0 10px rgba(0,0,0,0.35)',
+  },
+  targetPoseTimerFill: {
+    width: '100%',
+    height: '100%',
+    background: 'linear-gradient(90deg, #00ffaa, #00d5ff)',
+    borderRadius: 999,
+    boxShadow: '0 0 12px rgba(0, 213, 255, 0.5)',
   },
 }
