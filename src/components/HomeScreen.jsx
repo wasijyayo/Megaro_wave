@@ -358,7 +358,7 @@ export default function HomeScreen({ onStart, wiiBoard, onBattle }) {
   const handleConnect = async () => { connected ? await disconnect() : await connect() }
   const handleCalibrate = () => setShowCalibPopup(true)
 
-  const wiiStatusColor = connected ? '#00ffaa' : '#ff3366'
+  const wiiStatusColor = connected ? '#00ffaa' : '#ffcc33'
   const wiiStatusText = connected ? 'SYS.ONLINE' : 'SYS.OFFLINE'
 
   return (
@@ -629,7 +629,7 @@ const s = {
     boxShadow: '0 0 20px rgba(0, 255, 255, 0.2), inset 0 0 10px rgba(0, 255, 255, 0.2)', overflow: 'hidden', textShadow: '0 0 8px #00ffff'
   },
   secondaryCyberBtn: {
-    background: 'transparent', border: '1px dashed rgba(255, 51, 102, 0.5)', color: '#ff3366',
+    background: 'transparent', border: '1px dashed rgba(255, 204, 51, 0.55)', color: '#ffcc33',
     padding: '14px 0', fontSize: 14, fontWeight: 700, letterSpacing: '0.15em', cursor: 'pointer', transition: 'all 0.2s',
   },
 
