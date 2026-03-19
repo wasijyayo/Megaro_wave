@@ -287,7 +287,7 @@ function checkPose(poseId, lm) {
 }
 
 // ─────────────────────────────────────────────────────────
-export default function GameScene({ playerName, onGameOver, wiiBoard, waveParamsOverride, onScoreChange, selectedWifi, remoteVideoTrack}) {
+export default function GameScene({ playerName, onGameOver, wiiBoard, waveParamsOverride, onScoreChange, selectedWifi, remoteVideoTrack, remoteVideoElement }) {
   const elapsedTimeRef = useRef(0);
 
   // ── hooks ──
@@ -610,6 +610,7 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
         waveParams={effectiveWaveParams}
         personCanvas={combinedCanvas}
         remoteVideoTrack={remoteVideoTrack}
+        remoteVideoElement={remoteVideoElement}
         calibratedRef={copRef}
         onElapsedTime={(t) => {
           elapsedTimeRef.current = t;

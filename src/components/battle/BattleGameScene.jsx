@@ -1,19 +1,26 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import GameScene from '../game/GameScene.jsx'
 import { MSG } from '../../hooks/useLiveKitBattle.js'
 
 // 相手のカメラ映像を表示するコンポーネント
-function OpponentVideo({ track }) {
+function OpponentVideo({ track, onVideoElement }) {
   const containerRef = useRef(null)
 
   useEffect(() => {
     if (!track || !containerRef.current) return
     const el = track.attach()
+    el.muted = true
+    el.playsInline = true
     el.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:8px;transform:scaleX(-1)'
     containerRef.current.innerHTML = ''
     containerRef.current.appendChild(el)
-    return () => track.detach()
-  }, [track])
+    onVideoElement?.(el)
+
+    return () => {
+      onVideoElement?.(null)
+      track.detach(el)
+    }
+  }, [track, onVideoElement])
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
 }
@@ -32,6 +39,7 @@ export default function BattleGameScene({
   onGameOver,
 }) {
   const myScoreRef = useRef(0)
+  const [remoteVideoElement, setRemoteVideoElement] = useState(null)
 
   // 1秒ごとにスコアをデータチャンネルで送信
   useEffect(() => {
@@ -61,18 +69,22 @@ export default function BattleGameScene({
         onGameOver={handleGameOver}
         onScoreChange={handleScoreChange}
         remoteVideoTrack={remoteVideoTrack}
+        remoteVideoElement={remoteVideoElement}
       />
 
       {/* 相手の映像 + スコア */}
       <div style={s.opponentPanel}>
-        <div style={s.videoBox}>
-          {remoteVideoTrack
-            ? <OpponentVideo track={remoteVideoTrack} />
-            : <div style={s.noVideo}>映像なし</div>
-          }
-        </div>
         <div style={s.opponentLabel}>相手</div>
         <div style={s.opponentScore}>{opponentScore.toLocaleString()}</div>
+      </div>
+
+      <div style={s.videoBox}>
+        {/* 映像の再生自体は止めないために、見えない状態で置いておく */}
+        <div style={{ display: 'none' }}>
+          {remoteVideoTrack && (
+            <OpponentVideo track={remoteVideoTrack} onVideoElement={setRemoteVideoElement} />
+          )}
+        </div>
       </div>
 
       {/* ステージ名（WiFi SSID） */}
@@ -88,11 +100,11 @@ const s = {
     position: 'absolute',
     top: 180,
     left: 16,
-    width: 160,
+    width: 120,
     background: 'rgba(4,12,26,0.8)',
     borderRadius: 10,
     border: '1px solid #1e3a6a',
-    padding: 8,
+    padding: 10,
     pointerEvents: 'none',
     zIndex: 30,
   },
@@ -103,18 +115,23 @@ const s = {
     borderRadius: 8,
     overflow: 'hidden',
   },
-  noVideo: {
-    width: '100%', height: '100%',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    color: '#444', fontSize: 11,
-  },
   opponentLabel: {
     fontSize: 10, color: '#888', textAlign: 'center',
-    marginTop: 6, letterSpacing: '0.08em', textTransform: 'uppercase',
+    letterSpacing: '0.08em', textTransform: 'uppercase',
   },
   opponentScore: {
     fontSize: 20, fontWeight: 900, color: '#fff',
     textAlign: 'center', textShadow: '0 0 12px #00aaff',
+  },
+  hiddenVideoHost: {
+    position: 'absolute',
+    width: 2,
+    height: 2,
+    overflow: 'hidden',
+    opacity: 0,
+    pointerEvents: 'none',
+    left: -9999,
+    top: -9999,
   },
   stageLabel: {
     position: 'absolute',

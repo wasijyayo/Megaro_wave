@@ -278,12 +278,14 @@ export default function BackgroundScene({
   waveParams,
   personCanvas,
   remoteVideoTrack,
+  remoteVideoElement,
   personTransform,
   calibratedRef,
 }: {
   waveParams?: { amplitude?: number; frequency?: number; speed?: number; heightPattern?: number[] };
   personCanvas?: HTMLCanvasElement;
   remoteVideoTrack?: any;
+  remoteVideoElement?: HTMLVideoElement | null;
   personTransform?: { position?: [number, number, number]; rotation?: [number, number, number]; scale?: [number, number, number] };
   calibratedRef?: any;
 }) {
@@ -336,6 +338,7 @@ export default function BackgroundScene({
       {remoteVideoTrack && (
         <OpponentPlane
           videoTrack={remoteVideoTrack}
+          videoElement={remoteVideoElement}
           position={[-2.5, -0.35, -1]}
           waveParams={params}
           heightOffset={2}

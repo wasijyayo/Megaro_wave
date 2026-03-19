@@ -9,42 +9,56 @@ const PLANE_HEIGHT = 3.2
 
 export default function OpponentPlane({
   videoTrack,
+  videoElement,
   position = [-2.5, 0, -1],
   waveParams,
   heightOffset = 0,
 }: {
   videoTrack: any
+  videoElement?: HTMLVideoElement | null
   position?: [number, number, number]
   waveParams?: any
   heightOffset?: number
 }) {
   const groupRef = useRef<THREE.Group>(null)
 
-  // 1. LiveKitのTrackからVideo要素を生成
-  const videoEl = useMemo(() => {
-    if (!videoTrack) return null
+  // 左上パネルから video 要素が共有されない場合のみ、ここで attach する
+  const attachedVideoEl = useMemo(() => {
+    if (!videoTrack || videoElement) return null
     const el = document.createElement('video')
     el.muted = true
     el.playsInline = true
     videoTrack.attach(el)
     return el
-  }, [videoTrack])
+  }, [videoTrack, videoElement])
+
+  const sourceVideoEl = videoElement ?? attachedVideoEl
 
   useEffect(() => {
-    return () => { if (videoTrack && videoEl) videoTrack.detach(videoEl) }
-  }, [videoTrack, videoEl])
+    return () => { if (videoTrack && attachedVideoEl) videoTrack.detach(attachedVideoEl) }
+  }, [videoTrack, attachedVideoEl])
 
   // 2. Video要素をThree.jsのテクスチャに変換
   const texture = useMemo(() => {
-    if (!videoEl) return null
-    const tex = new THREE.VideoTexture(videoEl)
+    if (!sourceVideoEl) return null
+    const tex = new THREE.VideoTexture(sourceVideoEl)
     tex.colorSpace = THREE.SRGBColorSpace
+    tex.generateMipmaps = false
+    tex.minFilter = THREE.LinearFilter
+    tex.magFilter = THREE.LinearFilter
+    tex.wrapT = THREE.ClampToEdgeWrapping
     // セルフィー用 水平ミラー反転（相手の映像を鏡合わせにするかはお好みで）
     tex.wrapS = THREE.RepeatWrapping
     tex.repeat.set(-1, 1)
     tex.offset.set(1, 0)
     return tex
-  }, [videoEl])
+  }, [sourceVideoEl])
+
+  useEffect(() => {
+    return () => {
+      texture?.dispose()
+    }
+  }, [texture])
 
   // 3. サーフボードの読み込み
   let gltf: any = null
@@ -80,7 +94,8 @@ export default function OpponentPlane({
           depthWrite={false}
           uniforms={{
             map: { value: texture },
-            keyColor: { value: new THREE.Color('#00FF00') } // 緑色を抜く
+            keyColor: { value: new THREE.Color('#00FF00') }, // 緑色を抜く
+            keyThreshold: { value: 0.9 },
           }}
           vertexShader={`
             varying vec2 vUv;
@@ -92,11 +107,14 @@ export default function OpponentPlane({
           fragmentShader={`
             uniform sampler2D map;
             uniform vec3 keyColor;
+            uniform float keyThreshold;
             varying vec2 vUv;
             void main() {
               vec4 color = texture2D(map, vUv);
-              float diff = length(color.rgb - keyColor);
-              if (diff < 0.4) discard; 
+              // sqrt を使わない距離近似でクロマキー判定を軽量化
+              vec3 diff = abs(color.rgb - keyColor);
+              float chromaDiff = diff.r + diff.g + diff.b;
+              if (chromaDiff < keyThreshold) discard;
               gl_FragColor = color;
             }
           `}

@@ -49,8 +49,8 @@ export default function BattleWaitingScreen({ roomName, isHost, liveKit, onGameS
         // ──── gbCanvasからTrackを取り出す処理 ────
         let customTrack = null
         if (gbCanvas) {
-          // FPSを15に落としてキャプチャ(負荷軽減)
-          const stream = gbCanvas.captureStream(15) 
+          // 相手側のデコード負荷を抑えるため、待機中の配信fpsを少し下げる
+          const stream = gbCanvas.captureStream(12)
           customTrack = stream.getVideoTracks()[0]
         }
 
