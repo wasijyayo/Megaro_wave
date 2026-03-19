@@ -39,7 +39,9 @@ export default function BattleGameScene({
   onGameOver,
 }) {
   const myScoreRef = useRef(0)
+  const isWaitingRef = useRef(false)
   const [remoteVideoElement, setRemoteVideoElement] = useState(null)
+  const [isWaiting, setIsWaiting] = useState(false)
 
   // 1秒ごとにスコアをデータチャンネルで送信
   useEffect(() => {
@@ -50,12 +52,17 @@ export default function BattleGameScene({
   }, [sendMessage])
 
   const handleScoreChange = (score) => {
-    myScoreRef.current = score
+    if (!isWaitingRef.current) {
+      myScoreRef.current = score
+    }
   }
 
   const handleGameOver = (score) => {
+    if (isWaitingRef.current) return  // 2回目以降の呼び出しを無視
+    isWaitingRef.current = true
     myScoreRef.current = score
     sendMessage({ type: MSG.GAME_OVER, score })
+    setIsWaiting(true)
     onGameOver(score)
   }
 
@@ -88,6 +95,17 @@ export default function BattleGameScene({
       {/* ステージ名（WiFi SSID） */}
       {wifiLabel && (
         <div style={s.stageLabel}>{wifiLabel}</div>
+      )}
+
+      {/* 待機オーバーレイ（自分がゲームオーバー後、相手を待っている間） */}
+      {isWaiting && (
+        <div style={s.waitingOverlay}>
+          <div style={s.waitingBox}>
+            <div style={s.waitingTitle}>GAME OVER</div>
+            <div style={s.waitingScore}>{myScoreRef.current.toLocaleString()}</div>
+            <div style={s.waitingLabel}>相手のゲーム終了を待っています...</div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -130,6 +148,36 @@ const s = {
     pointerEvents: 'none',
     left: -9999,
     top: -9999,
+  },
+  waitingOverlay: {
+    position: 'absolute',
+    inset: 0,
+    background: 'rgba(0,0,0,0.75)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 50,
+  },
+  waitingBox: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 12,
+    background: 'rgba(4,12,26,0.9)',
+    border: '1px solid #1e3a6a',
+    borderRadius: 16,
+    padding: '40px 56px',
+  },
+  waitingTitle: {
+    fontSize: 28, fontWeight: 900, color: '#fff',
+    letterSpacing: '0.15em', textShadow: '0 0 16px #00aaff',
+  },
+  waitingScore: {
+    fontSize: 48, fontWeight: 900, color: '#00aaff',
+    textShadow: '0 0 20px #00aaff',
+  },
+  waitingLabel: {
+    fontSize: 14, color: '#888', letterSpacing: '0.05em',
   },
   stageLabel: {
     position: 'absolute',

@@ -8,6 +8,7 @@ export default function HUD({
   waveLabel,
   difficultyMultiplier,
   combo,
+  comboMultiplier = 1,
   comboExpiryTime,
   comboDuration,
   lastAction,
@@ -105,6 +106,7 @@ export default function HUD({
       {/* 左中央: コンボカウンター */}
       {combo >= 1 && (
         <div style={s.comboArea}>
+          <div style={s.comboMultiplier}>{comboMultiplier.toFixed(2)}倍</div>
           <div style={s.comboNumber}>🔥 x{combo}</div>
           <div style={s.comboLabel}>COMBO</div>
           <ComboBar
@@ -449,14 +451,23 @@ const s = {
   comboNumber: {
     fontSize: 52,
     fontWeight: 900,
-    color: '#00ffff',
-    textShadow: '0 0 16px #00ffff, 0 0 32px rgba(255,68,0,0.5)',
+    color: '#ffd6d6',
+    textShadow: '0 0 16px #ff4d4d, 0 0 32px rgba(255, 50, 50, 0.7)',
     lineHeight: 1.1,
+  },
+  comboMultiplier: {
+    fontSize: 28,
+    fontWeight: 900,
+    color: '#ffe4a8',
+    textShadow: '0 0 14px rgba(255, 196, 77, 0.9), 0 0 28px rgba(255, 120, 40, 0.45)',
+    letterSpacing: '0.08em',
+    lineHeight: 1,
+    marginBottom: 8,
   },
   comboLabel: {
     fontSize: 18,
     fontWeight: 800,
-    color: '#00ffff',
+    color: '#ffb3b3',
     letterSpacing: '0.12em',
     marginTop: 4,
   },
@@ -464,16 +475,18 @@ const s = {
     marginTop: 8,
     width: '100%',
     height: 8,
-    background: 'rgba(255,255,255,0.15)',
+    background: 'rgba(255,255,255,0.12)',
     borderRadius: 3,
     overflow: 'hidden',
+    border: '1px solid rgba(255, 90, 90, 0.18)',
+    boxShadow: 'inset 0 0 8px rgba(60, 0, 0, 0.35)',
   },
   comboBarFill: {
     height: '100%',
-    background: 'linear-gradient(90deg, #00ffff, #0088ff)',
+    background: 'linear-gradient(90deg, #ff8a66, #ff3b3b)',
     borderRadius: 3,
     transition: 'width 0.05s linear',
-    boxShadow: '0 0 6px rgba(255,68,0,0.6)',
+    boxShadow: '0 0 10px rgba(255, 59, 59, 0.8)',
   },
   targetPoseTimerWrap: {
     marginTop: 10,
