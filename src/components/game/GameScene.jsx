@@ -15,6 +15,13 @@ const TOTAL_LIVES = 100;
 const BALANCE_TOLERANCE = 0.28; // CoP と目標傾きの許容差 (-1〜1)
 const IMBALANCE_TIMEOUT = 20; // ms: この時間超えるとライフ -1
 const COMBO_TIMEOUT = 4000; // ms: コンボが切れるまでの時間
+const TARGET_POSE_TIMEOUT = 10000; // ms: 目標ポーズの制限時間
+const COMBO_SCORE_MULTIPLIER = 1.1;
+
+function getComboMultiplier(comboCount) {
+  if (comboCount <= 0) return 1;
+  return COMBO_SCORE_MULTIPLIER ** comboCount;
+}
 // ── ポーズ定義 ──────────────────────────────────────────
 const POSE_LIST = [
   { id: "hands-behind-head", label: "両手を頭の後ろ", points: 1000 },
@@ -386,6 +393,9 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
   const [currentPose, setCurrentPose] = useState(
     () => POSE_LIST[Math.floor(Math.random() * POSE_LIST.length)],
   );
+  const [targetPoseExpiryTime, setTargetPoseExpiryTime] = useState(
+    () => performance.now() + TARGET_POSE_TIMEOUT,
+  );
   // ── ポーズクリアエフェクト ──
   const [poseClearEvent, setPoseClearEvent] = useState(null);
   const comboRef = useRef(0);
@@ -402,6 +412,7 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
   const lastActionRef = useRef(null);
   const targetPoseActiveRef = useRef(false);
   const currentPoseRef = useRef(currentPose);
+  const targetPoseExpiryRef = useRef(targetPoseExpiryTime);
 
   // waveParams を ref に同期
   useEffect(() => {
@@ -426,6 +437,10 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
     currentPoseRef.current = currentPose;
   }, [currentPose]);
 
+  useEffect(() => {
+    targetPoseExpiryRef.current = targetPoseExpiryTime;
+  }, [targetPoseExpiryTime]);
+
   // ── ゲーム準備チェック ──
   const [apiReady, setApiReady] = useState(false);
   useEffect(() => {
@@ -443,16 +458,33 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
 
     let rafId;
 
+    const advanceTargetPose = (currentId) => {
+      const next = pickRandomPose(currentId);
+      const nextExpiry = performance.now() + TARGET_POSE_TIMEOUT;
+      currentPoseRef.current = next;
+      targetPoseActiveRef.current = false;
+      targetPoseExpiryRef.current = nextExpiry;
+      setCurrentPose(next);
+      setTargetPoseActive(false);
+      setTargetPoseExpiryTime(nextExpiry);
+    };
+
     const loop = (timestamp) => {
       rafId = requestAnimationFrame(loop);
 
       const wpf = waveParamsRef.current;
       const elapsedTime = elapsedTimeRef.current;
       const currentPoseData = poseDataRef.current;
+      const now = performance.now();
 
       // ── ポーズ判定 (MediaPipe Landmarks) ──
 
       const activePose = currentPoseRef.current;
+      if (now >= targetPoseExpiryRef.current) {
+        advanceTargetPose(activePose.id);
+        return;
+      }
+
       let detectedAction = null;
       if (
         currentPoseData &&
@@ -526,13 +558,16 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
             points: detectedAction.points,
             combo: currentCombo,
           });
-
-          const next = pickRandomPose(detectedAction.id);
-          currentPoseRef.current = next;
-          setCurrentPose(next);
-          // ポーズ成功フラグをリセット
-          targetPoseActiveRef.current = false;
-          setTargetPoseActive(false);
+          advanceTargetPose(detectedAction.id);
+        } else {
+          earnedPoints = addScoreRef.current(detectedAction.points);
+          const newAction = {
+            id: Date.now(),
+            label: detectedAction.label,
+            points: Math.round(earnedPoints),
+          };
+          lastActionRef.current = newAction;
+          setLastAction(newAction);
         }
         // コンボは4秒タイマーでのみリセット（非ポーズアクションでは維持）
       } else if (!detectedAction && lastActionRef.current) {
@@ -631,6 +666,8 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
         comboDuration={COMBO_TIMEOUT}
         lastAction={lastAction}
         targetPose={currentPose}
+        targetPoseExpiryTime={targetPoseExpiryTime}
+        targetPoseDuration={TARGET_POSE_TIMEOUT}
         targetPoseActive={targetPoseActive}
       />
 
@@ -699,12 +736,14 @@ const s = {
     position: "absolute",
     top: 12,
     left: 12,
-    background: "rgba(0,0,0,0.55)",
+    background: "rgba(6, 17, 33, 0.28)",
     color: "#fff",
     padding: "8px 12px",
     borderRadius: 6,
     fontSize: 13,
     fontFamily: "monospace",
+    backdropFilter: "blur(8px)",
+    border: "1px solid rgba(255,255,255,0.08)",
     pointerEvents: "none",
     lineHeight: 1.5,
     zIndex: 20,
@@ -728,7 +767,7 @@ const s = {
   },
   loadingBox: {
     border: "1px solid rgba(0, 255, 255, 0.4)",
-    backgroundColor: "rgba(6, 17, 33, 0.7)",
+    backgroundColor: "rgba(6, 17, 33, 0.42)",
     padding: "40px",
     borderRadius: "12px",
     boxShadow: "0 0 30px rgba(0, 255, 255, 0.2), inset 0 0 20px rgba(0, 255, 255, 0.1)",

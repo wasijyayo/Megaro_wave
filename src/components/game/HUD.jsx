@@ -12,27 +12,29 @@ export default function HUD({
   comboDuration,
   lastAction,
   targetPose,
+  targetPoseExpiryTime,
+  targetPoseDuration = 10000,
   targetPoseActive,
   boardConnected,
 }) {
   return (
     <div style={s.root}>
       {/* 左上: ライフ */}
-      <div style={{ position: 'absolute', top: 50, left: 50 }}>
-        <div style={s.label}>LIVES</div>
-        <div style={{ marginTop: 8, width: 180 }}>
-          <div style={{ position: 'relative', height: 14, background: '#222', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
+      <div style={s.livesPanel}>
+        <div style={s.livesHeader}>LIVES</div>
+        <div style={s.livesMeterWrap}>
+          <div style={s.livesTrack}>
             <div
               style={{
                 position: 'absolute', left: 0, top: 0, bottom: 0,
                 width: `${Math.min(Math.max(lives / (maxLives || 1), 0), 1) * 100}%`,
-                background: 'linear-gradient(90deg, #ff4444, #ffaa33, #00ff88 )',
+                background: 'linear-gradient(90deg, #ff3b3b 0%, #ff8a1f 36%, #ffe14d 68%, #2dff87 100%)',
                 transition: 'width 280ms linear',
-                boxShadow: '0 0 8px rgba(255,68,0,0.18) inset'
+                boxShadow: '0 0 18px rgba(255,120,40,0.45), inset 0 0 12px rgba(255,255,255,0.18)'
               }}
             />
           </div>
-          <div style={{ marginTop: 6, fontSize: 12, color: '#ccc' }}>
+          <div style={s.livesText}>
             {Math.round((Math.min(Math.max(lives / (maxLives || 1), 0), 1) * 100))}% &nbsp;({Math.max(0, Math.floor(lives))}/{maxLives})
           </div>
         </div>
@@ -61,9 +63,15 @@ export default function HUD({
             marginTop: 12,
             padding: '10px 12px',
             borderRadius: 12,
-            background: targetPoseActive ? 'rgba(68,255,136,0.22)' : 'rgba(0,0,0,0.5)',
-            border: `1px solid ${targetPoseActive ? '#00ff88' : 'rgba(255,255,255,0.14)'}`,
-            boxShadow: targetPoseActive ? '0 0 18px rgba(68,255,136,0.35)' : 'none',
+            background: targetPoseActive
+              ? 'linear-gradient(180deg, rgba(28, 44, 46, 0.62), rgba(6, 10, 18, 0.44))'
+              : 'linear-gradient(180deg, rgba(18, 24, 36, 0.6), rgba(4, 8, 16, 0.42))',
+            border: `1px solid ${targetPoseActive ? 'rgba(0,255,136,0.42)' : 'rgba(255,255,255,0.18)'}`,
+            boxShadow: targetPoseActive
+              ? '0 0 20px rgba(68,255,136,0.2)'
+              : '0 0 18px rgba(120,180,255,0.08)',
+            backdropFilter: 'blur(14px) saturate(140%)',
+            WebkitBackdropFilter: 'blur(14px) saturate(140%)',
           }}>
             <div style={{ ...s.label, textAlign: 'left' }}>TARGET POSE</div>
             <div style={{ marginTop: 8, display: 'flex', justifyContent: 'center' }}>
@@ -75,16 +83,20 @@ export default function HUD({
             <div style={{ marginTop: 4, fontSize: 12, color: targetPoseActive ? '#00ff88' : '#8bdcff', textAlign: 'center' }}>
               成功で +{targetPose.points.toLocaleString()}
             </div>
+            <TargetPoseTimerBar
+              expiryTime={targetPoseExpiryTime}
+              duration={targetPoseDuration}
+            />
           </div>
         )}
       </div>
 
       {/* 下中央: バランスメーター */}
-      <div style={{ position: 'absolute', bottom: 28, left: '50%', transform: 'translateX(-50%)', width: 240, textAlign: 'center' }}>
-        <div style={{ ...s.label, marginBottom: 6 }}>BALANCE</div>
+      <div style={s.balancePanel}>
+        <div style={s.balanceHeader}>BALANCE</div>
         <BalanceMeter balanceRef={balanceRef} />
         {!boardConnected && (
-          <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
+          <div style={s.balanceHint}>
             Wii Board 未接続 (中央固定)
           </div>
         )}
@@ -147,6 +159,45 @@ function ComboBar({ combo, comboExpiryTime, comboDuration }) {
   return (
     <div style={s.comboBarTrack}>
       <div ref={fillRef} style={s.comboBarFill} />
+    </div>
+  )
+}
+
+function TargetPoseTimerBar({ expiryTime, duration }) {
+  const fillRef = useRef(null)
+
+  useEffect(() => {
+    if (!fillRef.current) return undefined
+
+    if (expiryTime <= 0 || duration <= 0) {
+      fillRef.current.style.width = '0%'
+      return undefined
+    }
+
+    let rafId
+
+    const update = () => {
+      if (!fillRef.current) return
+
+      const remaining = Math.max(expiryTime - performance.now(), 0)
+      const ratio = Math.min(Math.max(remaining / duration, 0), 1)
+      fillRef.current.style.width = `${ratio * 100}%`
+
+      if (remaining > 0) {
+        rafId = requestAnimationFrame(update)
+      }
+    }
+
+    rafId = requestAnimationFrame(update)
+    return () => cancelAnimationFrame(rafId)
+  }, [expiryTime, duration])
+
+  return (
+    <div style={s.targetPoseTimerWrap}>
+      <div style={s.targetPoseTimerLabel}>NEXT POSE</div>
+      <div style={s.targetPoseTimerTrack}>
+        <div ref={fillRef} style={s.targetPoseTimerFill} />
+      </div>
     </div>
   )
 }
@@ -287,24 +338,32 @@ function BalanceMeter({ balanceRef }) {
       if (indicatorRef.current) {
         indicatorRef.current.style.left       = `${indicatorPct}%`
         indicatorRef.current.style.background = color
-        indicatorRef.current.style.boxShadow  = `0 0 8px ${color}`
+        indicatorRef.current.style.boxShadow  = `0 0 14px ${color}, 0 0 28px ${color}66`
       }
       if (zoneRef.current)      zoneRef.current.style.left      = `${targetPct - 12}%`
       if (targetLineRef.current) targetLineRef.current.style.left = `${targetPct}%`
-      if (trackRef.current)     trackRef.current.style.borderColor = color
+      if (trackRef.current) {
+        trackRef.current.style.borderColor = color
+        trackRef.current.style.boxShadow = `0 0 16px ${color}55, inset 0 0 20px rgba(255,255,255,0.06)`
+      }
     }
     rafId = requestAnimationFrame(update)
     return () => cancelAnimationFrame(rafId)
   }, [balanceRef])
 
   return (
-    <div ref={trackRef} style={{ position: 'relative', height: 18, background: '#111', borderRadius: 9, border: '2px solid #00ff88', overflow: 'hidden' }}>
-      {/* 許容ゾーン */}
-      <div ref={zoneRef} style={{ position: 'absolute', top: 0, bottom: 0, left: '38%', width: '24%', background: 'rgba(68,255,136,0.15)' }} />
-      {/* 目標ライン */}
-      <div ref={targetLineRef} style={{ position: 'absolute', top: 0, bottom: 0, left: '50%', width: 2, background: '#00ff88', opacity: 0.8 }} />
-      {/* 現在の重心 — transition なし、RAFで直接更新 */}
-      <div ref={indicatorRef} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 14, height: 14, borderRadius: '50%', background: '#00ff88', boxShadow: '0 0 8px #00ff88' }} />
+    <div style={s.balanceMeterWrap}>
+      <div style={s.balanceScale}>
+        <span>LEFT</span>
+        <span>CENTER</span>
+        <span>RIGHT</span>
+      </div>
+      <div ref={trackRef} style={s.balanceTrack}>
+        <div style={s.balanceGrid} />
+        <div ref={zoneRef} style={s.balanceZone} />
+        <div ref={targetLineRef} style={s.balanceTargetLine} />
+        <div ref={indicatorRef} style={s.balanceIndicator} />
+      </div>
     </div>
   )
 }
@@ -321,6 +380,45 @@ const s = {
     letterSpacing: '0.08em',
     color: '#7aadff',
     textTransform: 'uppercase',
+  },
+  livesPanel: {
+    position: 'absolute',
+    top: 34,
+    left: 34,
+    width: 260,
+    padding: '14px 16px 12px',
+    background: 'linear-gradient(180deg, rgba(7, 18, 38, 0.52), rgba(7, 18, 38, 0.26))',
+    border: '1px solid rgba(122, 173, 255, 0.24)',
+    borderRadius: 18,
+    boxShadow: '0 0 24px rgba(0, 180, 255, 0.14), inset 0 0 18px rgba(255,255,255,0.05)',
+    backdropFilter: 'blur(10px)',
+  },
+  livesHeader: {
+    fontSize: 13,
+    fontWeight: 900,
+    letterSpacing: '0.18em',
+    color: '#8ec5ff',
+    textShadow: '0 0 12px rgba(122, 173, 255, 0.65)',
+  },
+  livesMeterWrap: {
+    marginTop: 10,
+  },
+  livesTrack: {
+    position: 'relative',
+    height: 18,
+    background: 'linear-gradient(180deg, rgba(5, 8, 14, 0.96), rgba(18, 24, 34, 0.96))',
+    borderRadius: 999,
+    overflow: 'hidden',
+    border: '2px solid rgba(255,255,255,0.1)',
+    boxShadow: 'inset 0 0 14px rgba(0,0,0,0.5), 0 0 16px rgba(0,255,180,0.14)',
+  },
+  livesText: {
+    marginTop: 8,
+    fontSize: 20,
+    fontWeight: 900,
+    color: '#d8f7ff',
+    textShadow: '0 0 14px rgba(120, 240, 255, 0.45)',
+    letterSpacing: '0.03em',
   },
   actionPopup: {
     position: 'absolute',
@@ -340,7 +438,13 @@ const s = {
     top: '40%',
     transform: 'translate(-50%, -50%)',
     textAlign: 'center',
-    width: 160,
+    width: 220,
+    padding: '18px 18px 14px',
+    background: 'linear-gradient(180deg, rgba(18, 10, 24, 0.44), rgba(8, 14, 30, 0.2))',
+    border: '1px solid rgba(255, 90, 90, 0.45)',
+    borderRadius: 18,
+    boxShadow: '0 0 28px rgba(255, 59, 59, 0.25), inset 0 0 18px rgba(255, 255, 255, 0.08)',
+    backdropFilter: 'blur(8px)',
   },
   comboNumber: {
     fontSize: 52,
@@ -370,5 +474,121 @@ const s = {
     borderRadius: 3,
     transition: 'width 0.05s linear',
     boxShadow: '0 0 6px rgba(255,68,0,0.6)',
+  },
+  targetPoseTimerWrap: {
+    marginTop: 10,
+  },
+  targetPoseTimerLabel: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.55)',
+    letterSpacing: '0.14em',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  targetPoseTimerTrack: {
+    width: '100%',
+    height: 8,
+    background: 'rgba(255,255,255,0.12)',
+    borderRadius: 999,
+    overflow: 'hidden',
+    border: '1px solid rgba(255,255,255,0.08)',
+    boxShadow: 'inset 0 0 10px rgba(0,0,0,0.35)',
+  },
+  targetPoseTimerFill: {
+    width: '100%',
+    height: '100%',
+    background: 'linear-gradient(90deg, #00ffaa, #00d5ff)',
+    borderRadius: 999,
+    boxShadow: '0 0 12px rgba(0, 213, 255, 0.5)',
+  },
+  balancePanel: {
+    position: 'absolute',
+    bottom: 18,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    width: 360,
+    textAlign: 'center',
+    padding: '14px 18px 12px',
+    background: 'linear-gradient(180deg, rgba(5, 16, 34, 0.48), rgba(3, 9, 22, 0.24))',
+    border: '1px solid rgba(0, 255, 200, 0.32)',
+    borderRadius: 18,
+    boxShadow: '0 0 24px rgba(0, 255, 200, 0.18), inset 0 0 18px rgba(255,255,255,0.06)',
+    backdropFilter: 'blur(10px)',
+  },
+  balanceHeader: {
+    fontSize: 16,
+    fontWeight: 900,
+    color: '#9ffcff',
+    letterSpacing: '0.22em',
+    textShadow: '0 0 14px rgba(0,255,255,0.7)',
+    marginBottom: 8,
+  },
+  balanceHint: {
+    fontSize: 13,
+    color: '#8cb9c7',
+    marginTop: 8,
+    textShadow: '0 0 8px rgba(0, 180, 255, 0.28)',
+    letterSpacing: '0.04em',
+  },
+  balanceMeterWrap: {
+    width: '100%',
+  },
+  balanceScale: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    padding: '0 6px',
+    marginBottom: 6,
+    fontSize: 11,
+    fontWeight: 800,
+    color: 'rgba(180, 255, 255, 0.72)',
+    letterSpacing: '0.12em',
+  },
+  balanceTrack: {
+    position: 'relative',
+    height: 24,
+    background: 'linear-gradient(180deg, rgba(0,0,0,0.92), rgba(8,18,28,0.96))',
+    borderRadius: 999,
+    border: '2px solid #00ff88',
+    overflow: 'hidden',
+    boxShadow: '0 0 16px rgba(0,255,136,0.35), inset 0 0 20px rgba(255,255,255,0.06)',
+  },
+  balanceGrid: {
+    position: 'absolute',
+    inset: 0,
+    backgroundImage: 'repeating-linear-gradient(90deg, rgba(255,255,255,0.08) 0 1px, transparent 1px 20%)',
+    opacity: 0.4,
+    pointerEvents: 'none',
+  },
+  balanceZone: {
+    position: 'absolute',
+    top: 3,
+    bottom: 3,
+    left: '38%',
+    width: '24%',
+    background: 'linear-gradient(90deg, rgba(0,255,136,0.16), rgba(0,255,220,0.32), rgba(0,255,136,0.16))',
+    borderRadius: 999,
+    boxShadow: '0 0 18px rgba(0,255,180,0.3)',
+  },
+  balanceTargetLine: {
+    position: 'absolute',
+    top: -2,
+    bottom: -2,
+    left: '50%',
+    width: 3,
+    background: 'linear-gradient(180deg, rgba(255,255,255,0.95), #00ffcc)',
+    opacity: 0.95,
+    boxShadow: '0 0 10px rgba(0,255,204,0.8)',
+  },
+  balanceIndicator: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: 20,
+    height: 20,
+    borderRadius: '50%',
+    background: '#00ff88',
+    boxShadow: '0 0 10px #00ff88',
+    border: '2px solid rgba(255,255,255,0.85)',
   },
 }
