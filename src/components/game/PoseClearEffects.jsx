@@ -8,13 +8,13 @@ import { useEffect, useRef } from 'react'
  *  4. コンボカウンター
  */
 export default function PoseClearEffects({ event }) {
-  // event: { id, label, points, combo } | null
+  // event: { id, label, points, combo, multiplier } | null
   if (!event) return null
   return (
     <div style={styles.container} key={event.id}>
       <RingWave />
       <ParticleBurst />
-      <ScorePopup label={event.label} points={event.points} />
+      <ScorePopup label={event.label} points={event.points} multiplier={event.multiplier} />
     </div>
   )
 }
@@ -166,10 +166,11 @@ function drawCyberParticle(ctx, particle) {
 // ────────────────────────────────────────
 // スコアポップアップ（強化版）
 // ────────────────────────────────────────
-function ScorePopup({ label, points }) {
+function ScorePopup({ label, points, multiplier = 1 }) {
   return (
     <div style={styles.scorePopup}>
       <div style={styles.scoreLabel}>{label}</div>
+      <div style={styles.scoreMultiplier}>x{multiplier.toFixed(2)}</div>
       <div style={styles.scorePoints}>+{points.toLocaleString()}</div>
       <style>{scoreKeyframes}</style>
     </div>
@@ -292,6 +293,15 @@ const styles = {
     color: '#fff',
     textShadow: '0 0 12px rgba(0,170,255,0.8), 0 0 24px rgba(0,170,255,0.4)',
     letterSpacing: '0.05em',
+  },
+  scoreMultiplier: {
+    marginTop: 6,
+    fontSize: 36,
+    fontWeight: 900,
+    color: '#ffd1d1',
+    textShadow: '0 0 14px rgba(255, 80, 80, 0.9), 0 0 28px rgba(255, 80, 80, 0.4)',
+    letterSpacing: '0.08em',
+    lineHeight: 1,
   },
   scorePoints: {
     fontSize: 56,
