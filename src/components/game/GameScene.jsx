@@ -15,6 +15,12 @@ const TOTAL_LIVES = 100;
 const BALANCE_TOLERANCE = 0.28; // CoP と目標傾きの許容差 (-1〜1)
 const IMBALANCE_TIMEOUT = 20; // ms: この時間超えるとライフ -1
 const COMBO_TIMEOUT = 4000; // ms: コンボが切れるまでの時間
+const COMBO_SCORE_MULTIPLIER = 1.1;
+
+function getComboMultiplier(comboCount) {
+  if (comboCount <= 0) return 1;
+  return COMBO_SCORE_MULTIPLIER ** comboCount;
+}
 // ── ポーズ定義 ──────────────────────────────────────────
 const POSE_LIST = [
   { id: "hands-behind-head", label: "両手を頭の後ろ", points: 1000 },
@@ -412,6 +418,18 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
   const onScoreChangeRef = useRef(onScoreChange);
   useEffect(() => { onScoreChangeRef.current = onScoreChange }, [onScoreChange]);
 
+  const addScoreRef = useRef((basePoints, comboCountOverride = null) => {
+    const now = performance.now();
+    const comboActive = comboRef.current >= 1 && comboExpiryRef.current > now;
+    const comboCount = comboCountOverride ?? (comboActive ? comboRef.current : 0);
+    const earnedPoints = basePoints * getComboMultiplier(comboCount);
+    scoreRef.current += earnedPoints;
+    const nextScore = Math.floor(scoreRef.current);
+    setScore(nextScore);
+    onScoreChangeRef.current?.(nextScore);
+    return earnedPoints;
+  });
+
   useEffect(() => {
     boardConnectedRef.current = boardConnected;
   }, [boardConnected]);
@@ -495,35 +513,35 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
         (!lastActionRef.current ||
           lastActionRef.current.label !== detectedAction.label)
       ) {
-        const newAction = {
-          id: Date.now(),
-          label: detectedAction.label,
-          points: detectedAction.points,
-        };
-        lastActionRef.current = newAction;
-        setLastAction(newAction);
-
-        scoreRef.current += detectedAction.points;
-        setScore(Math.floor(scoreRef.current));
-        onScoreChangeRef.current?.(Math.floor(scoreRef.current));
+        const isPoseAction = POSE_LIST.some((p) => p.id === detectedAction.id);
+        let earnedPoints = detectedAction.points;
 
         // ── ポーズ成功時: 次のランダムポーズに切り替え + エフェクト ──
-        if (POSE_LIST.some((p) => p.id === detectedAction.id)) {
+        if (isPoseAction) {
           // コンボ加算
           comboRef.current += 1;
           const currentCombo = comboRef.current;
           setCombo(currentCombo);
           comboExpiryRef.current = performance.now() + COMBO_TIMEOUT;
           setComboExpiryTime(comboExpiryRef.current);
+          earnedPoints = addScoreRef.current(detectedAction.points, currentCombo);
 
           // サウンド再生
           playSuccessChime(currentCombo);
 
           // ビジュアルエフェクト発火
-          setPoseClearEvent({
+          const displayPoints = Math.round(earnedPoints);
+          const newAction = {
             id: Date.now(),
             label: detectedAction.label,
-            points: detectedAction.points,
+            points: displayPoints,
+          };
+          lastActionRef.current = newAction;
+          setLastAction(newAction);
+          setPoseClearEvent({
+            id: newAction.id,
+            label: detectedAction.label,
+            points: displayPoints,
             combo: currentCombo,
           });
 
@@ -533,6 +551,15 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
           // ポーズ成功フラグをリセット
           targetPoseActiveRef.current = false;
           setTargetPoseActive(false);
+        } else {
+          earnedPoints = addScoreRef.current(detectedAction.points);
+          const newAction = {
+            id: Date.now(),
+            label: detectedAction.label,
+            points: Math.round(earnedPoints),
+          };
+          lastActionRef.current = newAction;
+          setLastAction(newAction);
         }
         // コンボは4秒タイマーでのみリセット（非ポーズアクションでは維持）
       } else if (!detectedAction && lastActionRef.current) {
@@ -570,8 +597,7 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
       } else {
         imbalanceStartRef.current = null;
         // バランス維持ボーナス (微量)
-        scoreRef.current += wpf.difficultyMultiplier * 0.05;
-        setScore(Math.floor(scoreRef.current));
+        addScoreRef.current(wpf.difficultyMultiplier * 0.05);
       }
     };
 
@@ -627,6 +653,7 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
         waveLabel={effectiveWaveParams.label}
         difficultyMultiplier={effectiveWaveParams.difficultyMultiplier}
         combo={combo}
+        comboMultiplier={getComboMultiplier(combo)}
         comboExpiryTime={comboExpiryTime}
         comboDuration={COMBO_TIMEOUT}
         lastAction={lastAction}

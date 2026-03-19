@@ -115,6 +115,7 @@ export default function PersonPlane({
   const SURFBOARD_LENGTH = ASPECT * PLANE_HEIGHT * 0.9
   const SURFBOARD_WIDTH = PLANE_HEIGHT * 0.25
   const SURFBOARD_THICKNESS = 0.05
+  const SURFBOARD_Y = (-PLANE_HEIGHT / 2 - SURFBOARD_THICKNESS / 2 - surfboardGap) + 0.05
 
   const group = (
     <group ref={groupRef} position={position} rotation={rotation} scale={scale}>
@@ -130,7 +131,7 @@ export default function PersonPlane({
           <group
             ref={surfboardRef}
             name="Surfboard"
-            position={[0, (-PLANE_HEIGHT / 2 - SURFBOARD_THICKNESS / 2 - surfboardGap) + 0.7, 0.5]}
+            position={[0, SURFBOARD_Y, 0.5]}
             rotation={[-Math.PI / 2, 0, 0]}
           >
             {/* clone() をやめて同じオブジェクト参照を使い、primitive に直接 scale を渡す */}
@@ -141,7 +142,7 @@ export default function PersonPlane({
           <mesh
             ref={surfboardRef}
             name="Surfboard"
-            position={[0, (-PLANE_HEIGHT / 2 - SURFBOARD_THICKNESS / 2 - surfboardGap) + 0.7, 0.5]}
+            position={[0, SURFBOARD_Y, 0.5]}
             rotation={[-Math.PI / 2, 0, 0]}
           >
             <boxGeometry args={[SURFBOARD_LENGTH, SURFBOARD_THICKNESS, SURFBOARD_WIDTH]} />
