@@ -115,6 +115,8 @@ const WAVE_VERT = /* glsl */`
 
   varying float vHeight;
   varying vec3  vNormal_w;
+  varying float vArg;
+  varying float vPatternMix;
 
   float getPatternValue(int index) {
     int len = max(1, uPatternLen);
@@ -153,6 +155,8 @@ const WAVE_VERT = /* glsl */`
     // 高さをスケールで変位させる
     pos.z      = sin(arg) * uAmplitude * heightScale;
     vHeight    = pos.z;
+    vArg       = arg;
+    vPatternMix = heightScale;
 
     // 解析法線 計算（スケールを加味した簡易な偏微分）
     float dzdx  = freq * uAmplitude * heightScale * cos(arg);
@@ -166,21 +170,37 @@ const WAVE_VERT = /* glsl */`
 const WAVE_FRAG = /* glsl */`
   uniform vec3  uBaseColor;
   uniform float uAmplitude;
+  uniform float uTime;
 
   varying float vHeight;
   varying vec3  vNormal_w;
+  varying float vArg;
+  varying float vPatternMix;
 
   void main() {
-    // 高さに応じて白化（波頭）
-    float threshold = uAmplitude * 0.6;
-    float falloff   = max(0.1, uAmplitude * 0.6);
-    float t = clamp((vHeight - (threshold - falloff)) / (falloff * 2.0), 0.0, 1.0);
-    vec3 color = mix(uBaseColor, vec3(1.0), t);
+    float normalizedHeight = clamp(vHeight / max(uAmplitude * max(vPatternMix, 1.0), 0.001) * 0.5 + 0.5, 0.0, 1.0);
+    float crestMask = smoothstep(0.58, 0.98, normalizedHeight);
+    float troughMask = 1.0 - smoothstep(0.08, 0.45, normalizedHeight);
+    float flow = 0.5 + 0.5 * sin(vArg * 1.6 + uTime * 2.4);
+    float shimmer = pow(max(0.0, sin(vArg * 3.2 - uTime * 4.0)), 6.0);
+
+    vec3 deepColor = vec3(0.01, 0.08, 0.28);
+    vec3 midColor = mix(uBaseColor, vec3(0.0, 0.95, 1.0), 0.35 + flow * 0.2);
+    vec3 crestColor = vec3(1.0, 0.98, 0.92);
+    vec3 foamGlow = vec3(0.45, 0.95, 1.0);
+
+    vec3 color = mix(deepColor, midColor, smoothstep(0.02, 0.62, normalizedHeight));
+    color = mix(color, crestColor, crestMask * 0.3);
+    color += foamGlow * shimmer * (0.025 + crestMask * 0.045);
+    color += vec3(0.0, 0.12, 0.22) * flow * (1.0 - troughMask) * 0.35;
+    color *= (1.0 - troughMask * 0.35);
 
     // シンプル Lambert 照明
     vec3 lightDir = normalize(vec3(0.0, 1.0, 0.8));
     float diff = max(dot(vNormal_w, lightDir), 0.0);
-    color *= (0.35 + 0.65 * diff);
+    float rim = pow(1.0 - max(dot(vNormal_w, vec3(0.0, 0.0, 1.0)), 0.0), 2.4);
+    color *= (0.32 + 0.78 * diff);
+    color += foamGlow * rim * 0.08;
 
     gl_FragColor = vec4(color, 1.0);
   }
@@ -189,14 +209,14 @@ const WAVE_FRAG = /* glsl */`
 // ワイヤーフレームは同じ頂点変位、単色フラグメント
 const WIRE_FRAG = /* glsl */`
   void main() {
-    gl_FragColor = vec4(0.0, 1.0, 1.0, 0.3);
+    gl_FragColor = vec4(0.2, 0.9, 1.0, 0.24);
   }
 `;
 
 // 波のメッシュ（シェーダー版）
 const Ocean = ({ amplitude = 0.5, waveSpacing = 1.0, speed = 1.0, heightPattern = [], yOffset = 0 }: any) => {
   // エイリアシング（空間解像度不足による波の逆行現象）を防ぐために十分な分割数にする
-  const geometry = useMemo(() => new THREE.PlaneGeometry(30, 35, 64, 64), []);
+  const geometry = useMemo(() => new THREE.PlaneGeometry(30, 35, 48, 48), []);
 
   const { patternArray, patternLen } = useMemo(() => {
     const arr = Array.isArray(heightPattern) && heightPattern.length > 0 ? heightPattern : [1];
@@ -229,6 +249,7 @@ const Ocean = ({ amplitude = 0.5, waveSpacing = 1.0, speed = 1.0, heightPattern 
 
   // waveParams が変わったら uniform を同期
   useEffect(() => {
+    waveUniforms.uTime.value        = 0;
     waveUniforms.uAmplitude.value   = amplitude;
     waveUniforms.uWaveSpacing.value = waveSpacing;
     waveUniforms.uSpeed.value       = speed;
