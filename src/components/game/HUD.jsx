@@ -8,6 +8,7 @@ export default function HUD({
   waveLabel,
   difficultyMultiplier,
   combo,
+  comboMultiplier = 1,
   comboExpiryTime,
   comboDuration,
   lastAction,
@@ -93,6 +94,7 @@ export default function HUD({
       {/* 左中央: コンボカウンター */}
       {combo >= 1 && (
         <div style={s.comboArea}>
+          <div style={s.comboMultiplier}>x{comboMultiplier.toFixed(2)}</div>
           <div style={s.comboNumber}>🔥 x{combo}</div>
           <div style={s.comboLabel}>COMBO</div>
           <ComboBar
@@ -348,6 +350,14 @@ const s = {
     color: '#00ffff',
     textShadow: '0 0 16px #00ffff, 0 0 32px rgba(255,68,0,0.5)',
     lineHeight: 1.1,
+  },
+  comboMultiplier: {
+    fontSize: 18,
+    fontWeight: 900,
+    color: '#ffb3b3',
+    textShadow: '0 0 14px #ff3b3b',
+    letterSpacing: '0.08em',
+    marginBottom: 4,
   },
   comboLabel: {
     fontSize: 18,
