@@ -74,17 +74,15 @@ export default function BattleGameScene({
 
       {/* 相手の映像 + スコア */}
       <div style={s.opponentPanel}>
-        <div style={s.opponentLabel}>相手</div>
-        <div style={s.opponentScore}>{opponentScore.toLocaleString()}</div>
-      </div>
-
-      <div style={s.videoBox}>
-        {/* 映像の再生自体は止めないために、見えない状態で置いておく */}
-        <div style={{ display: 'none' }}>
-          {remoteVideoTrack && (
+        <div style={s.videoBox}>
+          {remoteVideoTrack ? (
             <OpponentVideo track={remoteVideoTrack} onVideoElement={setRemoteVideoElement} />
+          ) : (
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#444', fontSize: 11 }}>映像なし</div>
           )}
         </div>
+        <div style={s.opponentLabel}>相手</div>
+        <div style={s.opponentScore}>{opponentScore.toLocaleString()}</div>
       </div>
 
       {/* ステージ名（WiFi SSID） */}
