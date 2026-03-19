@@ -513,32 +513,35 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
         (!lastActionRef.current ||
           lastActionRef.current.label !== detectedAction.label)
       ) {
-        const newAction = {
-          id: Date.now(),
-          label: detectedAction.label,
-          points: detectedAction.points,
-        };
-        lastActionRef.current = newAction;
-        setLastAction(newAction);
+        const isPoseAction = POSE_LIST.some((p) => p.id === detectedAction.id);
+        let earnedPoints = detectedAction.points;
 
         // ── ポーズ成功時: 次のランダムポーズに切り替え + エフェクト ──
-        if (POSE_LIST.some((p) => p.id === detectedAction.id)) {
+        if (isPoseAction) {
           // コンボ加算
           comboRef.current += 1;
           const currentCombo = comboRef.current;
           setCombo(currentCombo);
           comboExpiryRef.current = performance.now() + COMBO_TIMEOUT;
           setComboExpiryTime(comboExpiryRef.current);
-          addScoreRef.current(detectedAction.points, currentCombo);
+          earnedPoints = addScoreRef.current(detectedAction.points, currentCombo);
 
           // サウンド再生
           playSuccessChime(currentCombo);
 
           // ビジュアルエフェクト発火
-          setPoseClearEvent({
+          const displayPoints = Math.round(earnedPoints);
+          const newAction = {
             id: Date.now(),
             label: detectedAction.label,
-            points: detectedAction.points,
+            points: displayPoints,
+          };
+          lastActionRef.current = newAction;
+          setLastAction(newAction);
+          setPoseClearEvent({
+            id: newAction.id,
+            label: detectedAction.label,
+            points: displayPoints,
             combo: currentCombo,
           });
 
@@ -549,7 +552,14 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
           targetPoseActiveRef.current = false;
           setTargetPoseActive(false);
         } else {
-          addScoreRef.current(detectedAction.points);
+          earnedPoints = addScoreRef.current(detectedAction.points);
+          const newAction = {
+            id: Date.now(),
+            label: detectedAction.label,
+            points: Math.round(earnedPoints),
+          };
+          lastActionRef.current = newAction;
+          setLastAction(newAction);
         }
         // コンボは4秒タイマーでのみリセット（非ポーズアクションでは維持）
       } else if (!detectedAction && lastActionRef.current) {
