@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import GameScene from '../game/GameScene.jsx'
 import { MSG } from '../../hooks/useLiveKitBattle.js'
 
-// 相手のカメラ映像を左上に表示するコンポーネント
+// 相手のカメラ映像を表示するコンポーネント
 function OpponentVideo({ track }) {
   const containerRef = useRef(null)
 
@@ -20,10 +20,9 @@ function OpponentVideo({ track }) {
 
 /**
  * 対戦用ゲーム画面
- * GameScene をそのまま使い、左上に相手映像・スコアを重ねる
+ * 最新の GameScene をそのまま使い、WebRTC関連UI（相手映像・スコア）を重ねる
  */
 export default function BattleGameScene({
-  playerName,
   wiiBoard,
   waveParamsOverride,
   wifiLabel,
@@ -54,16 +53,16 @@ export default function BattleGameScene({
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
-      {/* ゲーム本体（ソロモードと同じ） */}
+
+      {/* ゲーム本体（最新の GameScene をそのまま使用） */}
       <GameScene
-        playerName={playerName}
         wiiBoard={wiiBoard}
         waveParamsOverride={waveParamsOverride}
         onGameOver={handleGameOver}
         onScoreChange={handleScoreChange}
       />
 
-      {/* 左上: 相手の映像 + スコア */}
+      {/* 相手の映像 + スコア */}
       <div style={s.opponentPanel}>
         <div style={s.videoBox}>
           {remoteVideoTrack
@@ -75,7 +74,7 @@ export default function BattleGameScene({
         <div style={s.opponentScore}>{opponentScore.toLocaleString()}</div>
       </div>
 
-      {/* 左上のステージ名（wifiLabel） */}
+      {/* ステージ名（WiFi SSID） */}
       {wifiLabel && (
         <div style={s.stageLabel}>{wifiLabel}</div>
       )}
@@ -86,7 +85,7 @@ export default function BattleGameScene({
 const s = {
   opponentPanel: {
     position: 'absolute',
-    top: 80,
+    top: 180,
     left: 16,
     width: 160,
     background: 'rgba(4,12,26,0.8)',

@@ -15,12 +15,22 @@ const TOTAL_LIVES = 100;
 const BALANCE_TOLERANCE = 0.28; // CoP と目標傾きの許容差 (-1〜1)
 const IMBALANCE_TIMEOUT = 20; // ms: この時間超えるとライフ -1
 const COMBO_TIMEOUT = 4000; // ms: コンボが切れるまでの時間
+const TARGET_POSE_TIMEOUT = 10000; // ms: 目標ポーズの制限時間
+const COMBO_SCORE_MULTIPLIER = 1.1;
+
+function getComboMultiplier(comboCount) {
+  if (comboCount <= 0) return 1;
+  return COMBO_SCORE_MULTIPLIER ** comboCount;
+}
 // ── ポーズ定義 ──────────────────────────────────────────
 const POSE_LIST = [
   { id: "hands-behind-head", label: "両手を頭の後ろ", points: 1000 },
   { id: "hands-up", label: "両手を挙げる", points: 1000 },
   { id: "salute", label: "敬礼", points: 1000 },
   { id: "running-man", label: "ランニングマン", points: 1000 },
+  { id: "right-up-left-side", label: "右手を上、左手を横", points: 1000 },
+  { id: "hands-back", label: "後ろで手を組む", points: 1000 },
+  { id: "double-biceps", label: "両腕を曲げて力こぶ", points: 1000 },
 ];
 
 /** 現在と異なるランダムなポーズを返す */
@@ -117,13 +127,10 @@ function isSalutePose(lm) {
   const leftWrist = lm[15],
     rightWrist = lm[16];
 
-  // 右手首が右目の近く
   const rightWristNearEye =
     Math.abs(rightWrist.x - rightEye.x) < 0.12 &&
     Math.abs(rightWrist.y - rightEye.y) < 0.12;
-  // 右肘が肩より高い
   const rightElbowRaised = rightElbow.y < rightShoulder.y + 0.1;
-  // 左手首が肩より下
   const leftArmDown = leftWrist.y > leftShoulder.y + 0.1;
 
   return rightWristNearEye && rightElbowRaised && leftArmDown;
@@ -150,15 +157,13 @@ function isRunningManPose(lm) {
 
   const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
 
-  // パターン A: 右腕が上、左腕が下
   const rightArmUp =
-    rightWrist.y < shoulderY - 0.05 &&       // 手首が肩より上
-    rightElbow.y < rightShoulder.y + 0.05;    // 肘も肩より上
+    rightWrist.y < shoulderY - 0.05 &&
+    rightElbow.y < rightShoulder.y + 0.05;
   const leftArmDown =
-    leftWrist.y > leftShoulder.y + 0.05 &&    // 手首が肩より下
-    leftElbow.y > leftShoulder.y - 0.05;      // 肘が肩付近～下
+    leftWrist.y > leftShoulder.y + 0.05 &&
+    leftElbow.y > leftShoulder.y - 0.05;
 
-  // パターン B: 左腕が上、右腕が下（逆パターン）
   const leftArmUp =
     leftWrist.y < shoulderY - 0.05 &&
     leftElbow.y < leftShoulder.y + 0.05;
@@ -167,6 +172,103 @@ function isRunningManPose(lm) {
     rightElbow.y > rightShoulder.y - 0.05;
 
   return (rightArmUp && leftArmDown) || (leftArmUp && rightArmDown);
+}
+
+function isRightUpLeftSidePose(lm) {
+  if (
+    !lm?.[0] ||
+    !lm?.[12] ||
+    !lm?.[14] ||
+    !lm?.[16]
+  ) {
+    return false;
+  }
+
+  const nose = lm[0];
+  const rightShoulder = lm[12];
+  const rightElbow = lm[14];
+  const rightWrist = lm[16];
+  const dx = rightWrist.x - rightShoulder.x;
+  const dy = rightWrist.y - rightShoulder.y;
+  const armLength = Math.hypot(dx, dy);
+
+  const rightArmUp =
+    rightWrist.y < nose.y + 0.18 &&
+    rightElbow.y < rightShoulder.y + 0.24 &&
+    dy < -0.22 &&
+    dx > 0.02 &&
+    armLength > 0.32;
+
+  return rightArmUp;
+}
+
+function isHandsBackPose(lm) {
+  if (
+    !lm?.[11] ||
+    !lm?.[12] ||
+    !lm?.[13] ||
+    !lm?.[14] ||
+    !lm?.[15] ||
+    !lm?.[16] ||
+    !lm?.[23] ||
+    !lm?.[24]
+  ) {
+    return false;
+  }
+
+  const leftShoulder = lm[11], rightShoulder = lm[12];
+  const leftElbow = lm[13], rightElbow = lm[14];
+  const leftWrist = lm[15], rightWrist = lm[16];
+  const leftHip = lm[23], rightHip = lm[24];
+
+  const shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
+  const shoulderCenterY = (leftShoulder.y + rightShoulder.y) / 2;
+  const hipCenterY = (leftHip.y + rightHip.y) / 2;
+  const shoulderSpan = Math.abs(rightShoulder.x - leftShoulder.x);
+
+  const wristsBehindBack =
+    Math.abs(leftWrist.x - shoulderCenterX) < shoulderSpan * 0.45 &&
+    Math.abs(rightWrist.x - shoulderCenterX) < shoulderSpan * 0.45 &&
+    leftWrist.y > shoulderCenterY + 0.02 &&
+    rightWrist.y > shoulderCenterY + 0.02 &&
+    leftWrist.y < hipCenterY + 0.16 &&
+    rightWrist.y < hipCenterY + 0.16;
+
+  const elbowsBack =
+    leftElbow.y > leftShoulder.y &&
+    rightElbow.y > rightShoulder.y &&
+    Math.abs(leftElbow.x - shoulderCenterX) < shoulderSpan * 0.8 &&
+    Math.abs(rightElbow.x - shoulderCenterX) < shoulderSpan * 0.8;
+
+  return wristsBehindBack && elbowsBack;
+}
+
+function isDoubleBicepsPose(lm) {
+  if (
+    !lm?.[11] ||
+    !lm?.[12] ||
+    !lm?.[13] ||
+    !lm?.[14] ||
+    !lm?.[15] ||
+    !lm?.[16]
+  ) {
+    return false;
+  }
+
+  const leftShoulder = lm[11], rightShoulder = lm[12];
+  const leftElbow = lm[13], rightElbow = lm[14];
+  const leftWrist = lm[15], rightWrist = lm[16];
+  const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
+
+  const leftArmFlex =
+    Math.abs(leftElbow.y - shoulderY) < 0.14 &&
+    leftWrist.y < leftShoulder.y;
+
+  const rightArmFlex =
+    Math.abs(rightElbow.y - shoulderY) < 0.14 &&
+    rightWrist.y < rightShoulder.y;
+
+  return leftArmFlex && rightArmFlex;
 }
 
 /** ポーズIDに応じた判定関数のディスパッチ */
@@ -180,6 +282,12 @@ function checkPose(poseId, lm) {
       return isSalutePose(lm);
     case "running-man":
       return isRunningManPose(lm);
+    case "right-up-left-side":
+      return isRightUpLeftSidePose(lm);
+    case "hands-back":
+      return isHandsBackPose(lm);
+    case "double-biceps":
+      return isDoubleBicepsPose(lm);
     default:
       return false;
   }
@@ -285,6 +393,9 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
   const [currentPose, setCurrentPose] = useState(
     () => POSE_LIST[Math.floor(Math.random() * POSE_LIST.length)],
   );
+  const [targetPoseExpiryTime, setTargetPoseExpiryTime] = useState(
+    () => performance.now() + TARGET_POSE_TIMEOUT,
+  );
   // ── ポーズクリアエフェクト ──
   const [poseClearEvent, setPoseClearEvent] = useState(null);
   const comboRef = useRef(0);
@@ -301,6 +412,7 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
   const lastActionRef = useRef(null);
   const targetPoseActiveRef = useRef(false);
   const currentPoseRef = useRef(currentPose);
+  const targetPoseExpiryRef = useRef(targetPoseExpiryTime);
 
   // waveParams を ref に同期
   useEffect(() => {
@@ -310,6 +422,18 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
   // onScoreChange コールバックを ref で保持（再レンダー不要）
   const onScoreChangeRef = useRef(onScoreChange);
   useEffect(() => { onScoreChangeRef.current = onScoreChange }, [onScoreChange]);
+
+  const addScoreRef = useRef((basePoints, comboCountOverride = null) => {
+    const now = performance.now();
+    const comboActive = comboRef.current >= 1 && comboExpiryRef.current > now;
+    const comboCount = comboCountOverride ?? (comboActive ? comboRef.current : 0);
+    const earnedPoints = basePoints * getComboMultiplier(comboCount);
+    scoreRef.current += earnedPoints;
+    const nextScore = Math.floor(scoreRef.current);
+    setScore(nextScore);
+    onScoreChangeRef.current?.(nextScore);
+    return earnedPoints;
+  });
 
   useEffect(() => {
     boardConnectedRef.current = boardConnected;
@@ -324,6 +448,10 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
   useEffect(() => {
     currentPoseRef.current = currentPose;
   }, [currentPose]);
+
+  useEffect(() => {
+    targetPoseExpiryRef.current = targetPoseExpiryTime;
+  }, [targetPoseExpiryTime]);
 
   // ── ゲーム準備チェック ──
   const [apiReady, setApiReady] = useState(false);
@@ -342,16 +470,33 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
 
     let rafId;
 
+    const advanceTargetPose = (currentId) => {
+      const next = pickRandomPose(currentId);
+      const nextExpiry = performance.now() + TARGET_POSE_TIMEOUT;
+      currentPoseRef.current = next;
+      targetPoseActiveRef.current = false;
+      targetPoseExpiryRef.current = nextExpiry;
+      setCurrentPose(next);
+      setTargetPoseActive(false);
+      setTargetPoseExpiryTime(nextExpiry);
+    };
+
     const loop = (timestamp) => {
       rafId = requestAnimationFrame(loop);
 
       const wpf = waveParamsRef.current;
       const elapsedTime = elapsedTimeRef.current;
       const currentPoseData = poseDataRef.current;
+      const now = performance.now();
 
       // ── ポーズ判定 (MediaPipe Landmarks) ──
 
       const activePose = currentPoseRef.current;
+      if (now >= targetPoseExpiryRef.current) {
+        advanceTargetPose(activePose.id);
+        return;
+      }
+
       let detectedAction = null;
       if (
         currentPoseData &&
@@ -394,44 +539,47 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
         (!lastActionRef.current ||
           lastActionRef.current.label !== detectedAction.label)
       ) {
-        const newAction = {
-          id: Date.now(),
-          label: detectedAction.label,
-          points: detectedAction.points,
-        };
-        lastActionRef.current = newAction;
-        setLastAction(newAction);
-
-        scoreRef.current += detectedAction.points;
-        setScore(Math.floor(scoreRef.current));
-        onScoreChangeRef.current?.(Math.floor(scoreRef.current));
+        const isPoseAction = POSE_LIST.some((p) => p.id === detectedAction.id);
+        let earnedPoints = detectedAction.points;
 
         // ── ポーズ成功時: 次のランダムポーズに切り替え + エフェクト ──
-        if (POSE_LIST.some((p) => p.id === detectedAction.id)) {
+        if (isPoseAction) {
           // コンボ加算
           comboRef.current += 1;
           const currentCombo = comboRef.current;
           setCombo(currentCombo);
           comboExpiryRef.current = performance.now() + COMBO_TIMEOUT;
           setComboExpiryTime(comboExpiryRef.current);
+          earnedPoints = addScoreRef.current(detectedAction.points, currentCombo);
 
           // サウンド再生
           playSuccessChime(currentCombo);
 
           // ビジュアルエフェクト発火
-          setPoseClearEvent({
+          const displayPoints = Math.round(earnedPoints);
+          const newAction = {
             id: Date.now(),
             label: detectedAction.label,
-            points: detectedAction.points,
+            points: displayPoints,
+          };
+          lastActionRef.current = newAction;
+          setLastAction(newAction);
+          setPoseClearEvent({
+            id: newAction.id,
+            label: detectedAction.label,
+            points: displayPoints,
             combo: currentCombo,
           });
-
-          const next = pickRandomPose(detectedAction.id);
-          currentPoseRef.current = next;
-          setCurrentPose(next);
-          // ポーズ成功フラグをリセット
-          targetPoseActiveRef.current = false;
-          setTargetPoseActive(false);
+          advanceTargetPose(detectedAction.id);
+        } else {
+          earnedPoints = addScoreRef.current(detectedAction.points);
+          const newAction = {
+            id: Date.now(),
+            label: detectedAction.label,
+            points: Math.round(earnedPoints),
+          };
+          lastActionRef.current = newAction;
+          setLastAction(newAction);
         }
         // コンボは4秒タイマーでのみリセット（非ポーズアクションでは維持）
       } else if (!detectedAction && lastActionRef.current) {
@@ -469,8 +617,7 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
       } else {
         imbalanceStartRef.current = null;
         // バランス維持ボーナス (微量)
-        scoreRef.current += wpf.difficultyMultiplier * 0.05;
-        setScore(Math.floor(scoreRef.current));
+        addScoreRef.current(wpf.difficultyMultiplier * 0.05);
       }
     };
 
@@ -524,10 +671,13 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
         waveLabel={effectiveWaveParams.label}
         difficultyMultiplier={effectiveWaveParams.difficultyMultiplier}
         combo={combo}
+        comboMultiplier={getComboMultiplier(combo)}
         comboExpiryTime={comboExpiryTime}
         comboDuration={COMBO_TIMEOUT}
         lastAction={lastAction}
         targetPose={currentPose}
+        targetPoseExpiryTime={targetPoseExpiryTime}
+        targetPoseDuration={TARGET_POSE_TIMEOUT}
         targetPoseActive={targetPoseActive}
       />
 
@@ -541,10 +691,43 @@ export default function GameScene({ playerName, onGameOver, wiiBoard, waveParams
       {/* ロード画面（準備中） */}
       {!isGameReady && (
         <div style={s.loadingOverlay}>
-          <h2>NOW LOADING...</h2>
-          <p>API: {apiReady ? "OK" : "Heating..."}</p>
-          <p>Pose: {poseStatus}</p>
-          <p>Segment: {segStatus}</p>
+          <style>{`
+            @keyframes scanline {
+              0% { transform: translateY(-100%); }
+              100% { transform: translateY(100vh); }
+            }
+            @keyframes pulseGlow {
+              0% { text-shadow: 0 0 5px #0ff; }
+              50% { text-shadow: 0 0 20px #0ff; }
+              100% { text-shadow: 0 0 5px #0ff; }
+            }
+          `}</style>
+          <div style={s.loadingBox}>
+            <div style={s.scanline} />
+            <h2 style={s.loadingTitle}>SYSTEM INITIALIZATION</h2>
+            
+            <div style={s.statusRow}>
+              <span style={s.statusLabel}>NEURAL_API_CORE</span>
+              <span style={{...s.statusValue, color: apiReady ? "#0ff" : "#ffaa00"}}>{apiReady ? "[ ONLINE ]" : "[ HEATING... ]"}</span>
+            </div>
+            
+            <div style={s.statusRow}>
+              <span style={s.statusLabel}>MOTION_TRACKING</span>
+              <span style={{...s.statusValue, color: poseStatus === '実行中' ? "#0ff" : "#f0f"}}>{poseStatus || "SCANNING..."}</span>
+            </div>
+            
+            <div style={s.statusRow}>
+              <span style={s.statusLabel}>ENVIRONMENT_MAP</span>
+              <span style={{...s.statusValue, color: segStatus === '実行中' ? "#0ff" : "#f0f"}}>{segStatus || "ANALYZING..."}</span>
+            </div>
+            
+            <div style={s.progressBarContainer}>
+              <div style={{
+                ...s.progressBarFill, 
+                width: `${(apiReady ? 33 : 0) + (poseStatus === '実行中' ? 33 : 0) + (segStatus === '実行中' ? 34 : 0)}%`
+              }} />
+            </div>
+          </div>
         </div>
       )}
 
@@ -563,12 +746,14 @@ const s = {
     position: "absolute",
     top: 12,
     left: 12,
-    background: "rgba(0,0,0,0.55)",
+    background: "rgba(6, 17, 33, 0.28)",
     color: "#fff",
     padding: "8px 12px",
     borderRadius: 6,
     fontSize: 13,
     fontFamily: "monospace",
+    backdropFilter: "blur(8px)",
+    border: "1px solid rgba(255,255,255,0.08)",
     pointerEvents: "none",
     lineHeight: 1.5,
     zIndex: 20,
@@ -579,14 +764,74 @@ const s = {
     left: 0,
     width: "100%",
     height: "100%",
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
-    color: "#fff",
+    backgroundColor: "rgba(0, 5, 10, 0.85)",
+    backdropFilter: "blur(8px)",
+    color: "#0ff",
     display: "flex",
     flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
-    fontFamily: "monospace",
+    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
     zIndex: 50,
+    overflow: "hidden",
+  },
+  loadingBox: {
+    border: "1px solid rgba(0, 255, 255, 0.4)",
+    backgroundColor: "rgba(6, 17, 33, 0.42)",
+    padding: "40px",
+    borderRadius: "12px",
+    boxShadow: "0 0 30px rgba(0, 255, 255, 0.2), inset 0 0 20px rgba(0, 255, 255, 0.1)",
+    position: "relative",
+    overflow: "hidden",
+    minWidth: "360px",
+  },
+  scanline: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "10px",
+    background: "linear-gradient(to bottom, transparent, rgba(0, 255, 255, 0.4), transparent)",
+    animation: "scanline 3s linear infinite",
+    pointerEvents: "none",
+  },
+  loadingTitle: {
+    margin: "0 0 30px 0",
+    fontSize: "22px",
+    letterSpacing: "4px",
+    textAlign: "center",
+    textTransform: "uppercase",
+    animation: "pulseGlow 2s infinite",
+    borderBottom: "1px solid rgba(0, 255, 255, 0.3)",
+    paddingBottom: "15px",
+  },
+  statusRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    margin: "15px 0",
+    fontSize: "14px",
+    letterSpacing: "1px",
+  },
+  statusLabel: {
+    color: "rgba(255, 255, 255, 0.7)",
+  },
+  statusValue: {
+    fontWeight: "bold",
+    textShadow: "0 0 8px currentColor",
+  },
+  progressBarContainer: {
+    width: "100%",
+    height: "6px",
+    backgroundColor: "rgba(0, 255, 255, 0.1)",
+    marginTop: "30px",
+    borderRadius: "3px",
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: "#0ff",
+    boxShadow: "0 0 10px #0ff",
+    transition: "width 0.5s ease-out",
   },
   boardBtn: {
     position: "absolute",
