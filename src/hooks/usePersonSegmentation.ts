@@ -40,13 +40,20 @@ function getCenterCropRect(sourceWidth: number, sourceHeight: number, targetWidt
  */
 export function usePersonSegmentation() {
   // useState initializer で canvas を初回レンダー時に生成（参照が安定する）
+  //自分の映像を表示する用のキャンバス（背景透過）
   const [canvas] = useState<HTMLCanvasElement>(() => {
     const c = document.createElement('canvas')
     c.width = 720
     c.height = 1280
     return c
   })
-
+  // ──── 配信用（LiveKit用）のグリーンバックキャンバス ────
+  const [gbCanvas] = useState<HTMLCanvasElement>(() => {
+    const c = document.createElement('canvas')
+    c.width = 720
+    c.height = 1280
+    return c
+  })
   const [status, setStatus] = useState('初期化中...')
 
   const { video: sharedVideo, status: camStatus } = useSharedCamera({ width: 720, height: 1280 })
@@ -134,7 +141,19 @@ export function usePersonSegmentation() {
               canvas.height,
             )
             ctx.globalCompositeOperation = 'source-over'
-
+            
+            // ──── 配信用グリーンバックの生成処理 ────
+            if (gbCanvas.width !== canvas.width || gbCanvas.height !== canvas.height) {
+              gbCanvas.width = canvas.width
+              gbCanvas.height = canvas.height
+            }
+            const gbCtx = gbCanvas.getContext('2d')!
+            // 1. 緑色（クロマキー用）で塗りつぶす
+            gbCtx.fillStyle = '#00FF00'
+            gbCtx.fillRect(0, 0, gbCanvas.width, gbCanvas.height)
+            // 2. 透過済みの自分を上に貼る
+            gbCtx.drawImage(canvas, 0, 0)
+            
             mask.close()
           })
 
@@ -155,5 +174,5 @@ export function usePersonSegmentation() {
     }
   }, [canvas, sharedVideo, camStatus])
 
-  return { canvas, status }
+  return { canvas, status, gbCanvas }
 }

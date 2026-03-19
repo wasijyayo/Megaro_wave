@@ -8,7 +8,6 @@ export default function HUD({
   waveLabel,
   difficultyMultiplier,
   combo,
-  comboMultiplier = 1,
   comboExpiryTime,
   comboDuration,
   lastAction,
@@ -106,7 +105,6 @@ export default function HUD({
       {/* 左中央: コンボカウンター */}
       {combo >= 1 && (
         <div style={s.comboArea}>
-          <div style={s.comboMultiplier}>x{comboMultiplier.toFixed(2)}</div>
           <div style={s.comboNumber}>🔥 x{combo}</div>
           <div style={s.comboLabel}>COMBO</div>
           <ComboBar
@@ -451,43 +449,31 @@ const s = {
   comboNumber: {
     fontSize: 52,
     fontWeight: 900,
-    color: '#78f8ff',
-    textShadow: '0 0 18px #00ffff, 0 0 36px rgba(0, 255, 255, 0.8), 0 0 56px rgba(255, 90, 90, 0.5)',
-    lineHeight: 1,
-  },
-  comboMultiplier: {
-    fontSize: 44,
-    fontWeight: 900,
-    color: '#ffd1d1',
-    textShadow: '0 0 18px #ff3b3b, 0 0 34px rgba(255, 59, 59, 0.9)',
-    letterSpacing: '0.08em',
-    lineHeight: 1,
-    marginBottom: 10,
+    color: '#00ffff',
+    textShadow: '0 0 16px #00ffff, 0 0 32px rgba(255,68,0,0.5)',
+    lineHeight: 1.1,
   },
   comboLabel: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 800,
-    color: '#aefcff',
-    textShadow: '0 0 12px rgba(0, 255, 255, 0.6)',
-    letterSpacing: '0.16em',
-    marginTop: 8,
+    color: '#00ffff',
+    letterSpacing: '0.12em',
+    marginTop: 4,
   },
   comboBarTrack: {
-    marginTop: 12,
+    marginTop: 8,
     width: '100%',
-    height: 12,
-    background: 'rgba(255,255,255,0.12)',
-    borderRadius: 999,
+    height: 8,
+    background: 'rgba(255,255,255,0.15)',
+    borderRadius: 3,
     overflow: 'hidden',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    boxShadow: 'inset 0 0 12px rgba(0, 0, 0, 0.35)',
   },
   comboBarFill: {
     height: '100%',
-    background: 'linear-gradient(90deg, #ff6b6b, #ff1f1f)',
-    borderRadius: 999,
+    background: 'linear-gradient(90deg, #00ffff, #0088ff)',
+    borderRadius: 3,
     transition: 'width 0.05s linear',
-    boxShadow: '0 0 16px rgba(255, 31, 31, 0.85)',
+    boxShadow: '0 0 6px rgba(255,68,0,0.6)',
   },
   targetPoseTimerWrap: {
     marginTop: 10,

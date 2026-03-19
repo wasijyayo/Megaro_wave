@@ -3,7 +3,6 @@ import {
   Room,
   RoomEvent,
   Track,
-  VideoPresets,
   createLocalVideoTrack,
 } from 'livekit-client'
 import { getLiveKitToken } from '../firebase.js'
@@ -20,6 +19,7 @@ export const MSG = {
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
+const BATTLE_CAPTURE_RESOLUTION = { width: 480, height: 270 }
 
 /**
  * LiveKit 対戦フック
@@ -64,7 +64,8 @@ export function useLiveKitBattle({ onMessage } = {}) {
       adaptiveStream:    true,  // 回線に合わせて自動品質調整
       dynacast:          true,  // 不要なトラックの送信を自動停止
       videoCaptureDefaults: {
-        resolution: VideoPresets.h360.resolution, // 360p（負荷軽減）
+        // 対戦時は相手映像を中程度に落として全体負荷を抑える
+        resolution: BATTLE_CAPTURE_RESOLUTION,
       },
     })
 
@@ -141,15 +142,22 @@ export function useLiveKitBattle({ onMessage } = {}) {
     connectPromiseRef.current = null
   }, [])
 
-  // ── カメラ公開 ─────────────────────────────────────
-  const publishCamera = useCallback(async () => {
+// ── カメラ公開 ─────────────────────────────────────
+  // 引数に customTrack を受け取れるように変更します
+  const publishCamera = useCallback(async (customTrack = null) => {
     const room = roomRef.current
     if (!room || cameraRef.current) return // 二重公開防止
-    const track = await createLocalVideoTrack({
-      resolution: VideoPresets.h360.resolution,
-    })
-    await room.localParticipant.publishTrack(track)
-    cameraRef.current = track
+
+    let trackToPublish = customTrack
+    if (!trackToPublish) {
+      // カスタム映像が渡されなかった場合は、今まで通りWebカメラを取得します
+      trackToPublish = await createLocalVideoTrack({
+        resolution: BATTLE_CAPTURE_RESOLUTION,
+      })
+    }
+
+    await room.localParticipant.publishTrack(trackToPublish)
+    cameraRef.current = trackToPublish
   }, [])
 
   // ── データ送信 ─────────────────────────────────────

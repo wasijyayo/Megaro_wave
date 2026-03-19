@@ -1,7 +1,6 @@
 import { useMemo, useRef, MutableRefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { TransformControls } from '@react-three/drei'
-import { useGLTF } from '@react-three/drei'
+import { TransformControls, useGLTF, Clone } from '@react-three/drei'
 import * as THREE from 'three'
 import { getWaveHeight, calcWaveTilt } from '../../utils/waveParams'
 
@@ -116,7 +115,6 @@ export default function PersonPlane({
   const SURFBOARD_LENGTH = ASPECT * PLANE_HEIGHT * 0.9
   const SURFBOARD_WIDTH = PLANE_HEIGHT * 0.25
   const SURFBOARD_THICKNESS = 0.05
-  const SURFBOARD_Y = (-PLANE_HEIGHT / 2 - SURFBOARD_THICKNESS / 2 - surfboardGap) + 0.05
 
   const group = (
     <group ref={groupRef} position={position} rotation={rotation} scale={scale}>
@@ -132,18 +130,18 @@ export default function PersonPlane({
           <group
             ref={surfboardRef}
             name="Surfboard"
-            position={[0, SURFBOARD_Y, 0.5]}
+            position={[0, (-PLANE_HEIGHT / 2 - SURFBOARD_THICKNESS / 2 - surfboardGap) + 0.7, 0.5]}
             rotation={[-Math.PI / 2, 0, 0]}
           >
             {/* clone() をやめて同じオブジェクト参照を使い、primitive に直接 scale を渡す */}
             {/* X軸に対して90度回転させる */}
-            <primitive object={gltf.scene} scale={5} rotation={[Math.PI / 2, 0, 0]} />
+            <Clone object={gltf.scene} scale={5} rotation={[Math.PI / 2, 0, 0]} />
           </group>
         ) : (
           <mesh
             ref={surfboardRef}
             name="Surfboard"
-            position={[0, SURFBOARD_Y, 0.5]}
+            position={[0, (-PLANE_HEIGHT / 2 - SURFBOARD_THICKNESS / 2 - surfboardGap) + 0.7, 0.5]}
             rotation={[-Math.PI / 2, 0, 0]}
           >
             <boxGeometry args={[SURFBOARD_LENGTH, SURFBOARD_THICKNESS, SURFBOARD_WIDTH]} />

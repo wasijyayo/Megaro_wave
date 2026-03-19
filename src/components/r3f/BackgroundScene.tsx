@@ -5,6 +5,7 @@ import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import PersonPlane from './PersonPlane'
 import { getWaveHeight } from '../../utils/waveParams'
+import OpponentPlane from './OpponentPlane'
 
 // --- サイバー空間風のパーティクル ---
 const CyberParticles = ({ speed = 1.0 }: { speed?: number }) => {
@@ -214,7 +215,7 @@ const WIRE_FRAG = /* glsl */`
 `;
 
 // 波のメッシュ（シェーダー版）
-const Ocean = ({ amplitude = 0.5, waveSpacing = 1.0, speed = 1.0, heightPattern = [], yOffset = 0 }: any) => {
+const Ocean = ({ amplitude = 0.5, waveSpacing = 1.0, speed = 1.0, heightPattern = [] }: any) => {
   // エイリアシング（空間解像度不足による波の逆行現象）を防ぐために十分な分割数にする
   const geometry = useMemo(() => new THREE.PlaneGeometry(30, 35, 48, 48), []);
 
@@ -270,7 +271,7 @@ const Ocean = ({ amplitude = 0.5, waveSpacing = 1.0, speed = 1.0, heightPattern 
   });
 
   return (
-    <group position={[0, yOffset, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+    <group rotation={[-Math.PI / 2, 0, 0]}>
       <mesh geometry={geometry}>
         <shaderMaterial
           vertexShader={WAVE_VERT}
@@ -293,52 +294,22 @@ const Ocean = ({ amplitude = 0.5, waveSpacing = 1.0, speed = 1.0, heightPattern 
   );
 };
 
-// 指定座標の高さを動的に取得して追従する浮き(テスト用)
-type TrackerProps = {
-  targetX: number;
-  amplitude?: number;
-  frequency?: number;
-  speed?: number;
-  heightPattern?: number[];
-};
-
-const Tracker = ({ targetX, amplitude = 0.5, frequency = 1.0, speed = 1.0, heightPattern = [] }: TrackerProps) => {
-  const sphereRef = useRef<THREE.Mesh | null>(null);
-  const radius = 0.22; // 球の半径と同程度のオフセットを適用して埋まりを防止
-
-  useFrame((state) => {
-    const time = state.clock.getElapsedTime();
-    // ここで動的に指定座標(targetX, targetZ)の波の高さを取得
-    // (targetZ を廃止したため Z=0を使う)
-    const currentY = getWaveHeight(targetX, 0, time, amplitude, frequency, speed, heightPattern);
-    
-    if (sphereRef.current) {
-      // 波面に完全に埋まらないように、球の半径分だけ少し浮かせる
-      sphereRef.current.position.set(targetX, currentY + radius, 0);
-    }
-  });
-
-  return (
-    <mesh ref={sphereRef}>
-      <sphereGeometry args={[radius, 16, 16]} />
-      <meshStandardMaterial color="red" />
-    </mesh>
-  );
-};
 
 export default function BackgroundScene({
   waveParams,
   personCanvas,
+  remoteVideoTrack,
+  remoteVideoElement,
   personTransform,
   calibratedRef,
 }: {
   waveParams?: { amplitude?: number; frequency?: number; speed?: number; heightPattern?: number[] };
   personCanvas?: HTMLCanvasElement;
+  remoteVideoTrack?: any;
+  remoteVideoElement?: HTMLVideoElement | null;
   personTransform?: { position?: [number, number, number]; rotation?: [number, number, number]; scale?: [number, number, number] };
   calibratedRef?: any;
 }) {
-  const OCEAN_Y_OFFSET = -1.0
-
   const params = waveParams || {
     // デフォルトの波のパラメータ
     amplitude: 0.8,     // 波の高さ
@@ -369,7 +340,7 @@ export default function BackgroundScene({
       <Environment preset="night" />
 
       {/* 海面 */}
-      <Ocean {...params} yOffset={OCEAN_Y_OFFSET} />
+      <Ocean {...params} />
 
       {personCanvas && (
         <PersonPlane
@@ -385,9 +356,16 @@ export default function BackgroundScene({
           calibratedRef={calibratedRef}
         />
       )}
+      {remoteVideoTrack && (
+        <OpponentPlane
+          videoTrack={remoteVideoTrack}
+          videoElement={remoteVideoElement}
+          position={[-2.5, -0.35, -1]}
+          waveParams={params}
+          heightOffset={2}
+        />
+      )}
 
-      {/* 追加のサンプルトラッカー（残すか削除するかは任意） */}
-      <Tracker targetX={2} {...params} />
     </>
   );
 }
